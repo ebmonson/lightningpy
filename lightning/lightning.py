@@ -76,7 +76,7 @@ class Lightning:
         self.filter_labels = filter_labels
 
         if (cosmology is None):
-            self.cosmology = FlatLambdaCDM(0.70, 0.3)
+            self.cosmology = FlatLambdaCDM(H0=70, Om0=0.3)
         else:
             assert (isinstance(cosmology, FlatLambdaCDM)), "'cosmology' should be provided as an astropy cosmology object"
             self.cosmology = cosmology
@@ -300,7 +300,7 @@ class Lightning:
 
     def _setup_dust_att(self):
         '''
-            Initialize attenuation model.
+            Initialize dust attenuation model.
         '''
 
         if (self.atten_type == 'Calzetti'):
@@ -514,7 +514,7 @@ class Lightning:
 
     def get_model_likelihood(self, params, negative=True):
         '''
-            Log-likelihood of the model under the current parameters.
+            Log-likelihood of the model under the given parameters.
 
             If `negative` flag is set (on by default), returns the negative log likelihood
             (i.e. chi2 / 2).
@@ -536,7 +536,7 @@ class Lightning:
     def get_model_log_prob(self, params, negative=True, p_bound=np.inf):
         '''
             Log-probability (eventaully, including prior probability) of the model under the
-            current parameters.
+            given parameters.
 
             If `negative` flag is set (on by default), returns the negative log probability
             (i.e. chi2 / 2 + log(prior)).
@@ -637,12 +637,18 @@ class Lightning:
 
         p = [sfh_params, atten_params, dust_params]
 
+        # print(sfh_params)
+        # print(atten_params)
+        # print(dust_params)
+
         #ob_idcs = (params < self.param_bounds[:,0][None,:]) | (params > self.param_bounds[:,1][None,:])
 
         for i in np.arange(len(self.model_components)):
             mod = self.model_components[i]
             if mod is not None:
-                ob_mask[:,i] = np.any(mod.check_bounds(p[i]))
+                ob_mask[:,i] = np.any(mod.check_bounds(p[i]), axis=1)
+
+        #print(ob_mask)
 
         return np.any(ob_mask, axis=1)
 
@@ -681,7 +687,7 @@ class Lightning:
                 xx[:,var_dim] = x
                 xx[:,const_dim] = const_vals
                 lnp = self.get_model_log_prob(xx, negative=False)
-                print(xx[0,:])
+                #print(xx[0,:], lnp[0])
                 #print(lnp[:5])
                 #print(x.shape, lnp.shape)
                 return lnp
@@ -700,7 +706,7 @@ class Lightning:
 
         #post_burn = sampler.run_mcmc(p0, N_burn)
 
-        state = sampler.run_mcmc(p0[:,var_dim], Nsteps, progress=False)
+        state = sampler.run_mcmc(p0[:,var_dim], Nsteps, progress=True)
 
         return sampler
 
