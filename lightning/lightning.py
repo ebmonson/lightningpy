@@ -24,6 +24,7 @@ import astropy.units as u
 import astropy.constants as const
 from astropy.utils.exceptions import AstropyUserWarning
 from astropy.table import Table
+from astropy.io import ascii
 # Lightning
 from .sfh import PiecewiseConstSFH, DelayedExponentialSFH
 from .stellar import StellarModel
@@ -61,7 +62,8 @@ class Lightning:
                 top filter directory.
     '''
 
-    def __init__(self, filter_labels, redshift,
+    def __init__(self, filter_labels,
+                 redshift=None, lum_dist=None,
                  flux_obs=None, flux_obs_unc=None,
                  wave_grid=(0.1, 1000, 1200),
                  SFH_type='Piecewise-Constant', ages=None,
@@ -71,22 +73,47 @@ class Lightning:
                  print_setup_time=False,
                  cosmology=None):
 
-        self.redshift = redshift
-        self.path_to_filters = lightning_filter_path
         self.filter_labels = filter_labels
+        self.path_to_filters = lightning_filter_path
 
+        # Cosmology
         if (cosmology is None):
             self.cosmology = FlatLambdaCDM(H0=70, Om0=0.3)
         else:
             assert (isinstance(cosmology, FlatLambdaCDM)), "'cosmology' should be provided as an astropy cosmology object"
             self.cosmology = cosmology
 
+        # Handle distance indicators -- redshift or luminosity distance
+        if (redshift is not None):
+            self.redshift = redshift
+            DL = self.cosmology.luminosity_distance(self.redshift).value
+
+            if (DL < 10):
+                warnings.warn('Redshift results in a luminosity distance less than 10 Mpc. Setting DL to 10 Mpc to convert flux/uncertainty to Lnu.',
+                               AstropyUserWarning)
+                DL = 10
+
+        else:
+            if (lum_dist is not None):
+
+                DL = lum_dist
+                # For galaxies where a user might specify DL instead of z,
+                # z should be effectively 0.
+                self.redshift = 0.0
+
+            else:
+
+                raise ValueError("At least one of 'redshift' and 'lumin_dist' must be set.")
+
+        self.DL = DL
+
+
+        # Handle fluxes if they're provided at this stage
         if (flux_obs is None):
             self._flux_obs = None
             self.Lnu_obs = None
         else:
             self.flux_obs = flux_obs
-
 
         if (flux_obs_unc is None):
             self._flux_unc = None
@@ -103,25 +130,28 @@ class Lightning:
 
         self.wave_grid_obs = (1 + self.redshift) * self.wave_grid_rest
 
-        self.nu_grid_rest = const.c.to(u.um / u.s) / self.wave_grid_rest
-        self.nu_grid_obs = const.c.to(u.um / u.s) / self.wave_grid_obs
+        self.nu_grid_rest = const.c.to(u.um / u.s).value / self.wave_grid_rest
+        self.nu_grid_obs = const.c.to(u.um / u.s).value / self.wave_grid_obs
 
         # Initialize a dict for the filters. Might change this to a structured numpy array.
         self.filters = dict()
         for name in self.filter_labels:
             self.filters[name] = np.zeros(len(self.wave_grid_rest), dtype='float')
 
-
+        # Load the filters
         t0 = time.time()
         self._get_filters()
         self.Nfilters = len(self.filters)
         t1 = time.time()
 
+        # Get the mean wavelengths of the filters
         self.wave_obs = np.zeros(len(self.filter_labels), dtype='float')
         self._get_wave_obs()
-        self.nu_obs = const.c.to(u.um / u.s) / self.wave_obs
+        self.nu_obs = const.c.to(u.um / u.s).value / self.wave_obs
         t2 = time.time()
 
+        # This block steps up the star formation history and
+        # stellar population models
         allowed_SFHs = ['Piecewise-Constant', 'Delayed-Exponential']
         if SFH_type not in allowed_SFHs:
             print('Allowed SFHs are:', allowed_SFHs)
@@ -166,6 +196,7 @@ class Lightning:
         self._setup_stellar()
         t3 = time.time()
 
+        # Set up dust attenuation
         allowed_atten = ['Calzetti', 'Modified-Calzetti', 'None', None]
         if atten_type not in allowed_atten:
             print('Allowed attenuation curves are:', allowed_atten)
@@ -176,6 +207,7 @@ class Lightning:
 
         t4 = time.time()
 
+        # Set up dust emission
         if(dust_emission):
             self._setup_dust_em()
         else:
@@ -183,6 +215,8 @@ class Lightning:
 
         t5 = time.time()
 
+        # For later use, make an array of the model components and
+        # figure out how many components our total model has
         self.model_components = [self.sfh, self.atten, self.dust]
         self.Nparams = 0
         for mod in self.model_components:
@@ -250,14 +284,14 @@ class Lightning:
         mJy_to_cgs = 1e-26
         cgs_to_Lsun = (u.erg / u.s /u.Hz).to(u.solLum / u.Hz)
 
-        DL = self.cosmology.luminosity_distance(self.redshift).value
+        # DL = self.cosmology.luminosity_distance(self.redshift).value
+        #
+        # if (DL < 10):
+        #     warnings.warn('Redshift results in a luminosity distance less than 10 Mpc. Setting DL to 10 Mpc to convert flux/uncertainty to Lnu.',
+        #                    AstropyUserWarning)
+        #     DL = 10
 
-        if (DL < 10):
-            warnings.warn('Redshift results in a luminosity distance less than 10 Mpc. Setting DL to 10 Mpc to convert flux/uncertainty to Lnu.',
-                           AstropyUserWarning)
-            DL = 10
-
-        FtoL = 4 * np.pi * (DL * Mpc_to_cm) ** 2 * mJy_to_cgs * cgs_to_Lsun
+        FtoL = 4 * np.pi * (self.DL * Mpc_to_cm) ** 2 * mJy_to_cgs * cgs_to_Lsun
 
         return FtoL * flux
 
@@ -336,9 +370,11 @@ class Lightning:
                     print('============================')
                     mod_table = Table()
                     mod_table['Parameter'] = mod.param_names
-                    mod_table['Bounds'] = mod.param_bounds
+                    mod_table['Lo'] = mod.param_bounds[:,0]
+                    mod_table['Hi'] = mod.param_bounds[:,1]
                     mod_table['Description'] = mod.param_descr
-                    print(mod_table)
+                    #print(mod_table)
+                    ascii.write(mod_table, format='fixed_width_two_line')
         else:
             for mod in self.model_components:
                 if (mod is not None):
@@ -525,7 +561,7 @@ class Lightning:
 
         lnu_model, _ = self.get_model_lnu(params, stepwise=False) # ndarray(Nmodels, Nfilters)
 
-        chi2 = np.sum(((lnu_model - self.Lnu_obs[None,:]) / self.Lnu_unc[None,:])**2, axis=-1)
+        chi2 = np.nansum(((lnu_model - self.Lnu_obs[None,:]) / self.Lnu_unc[None,:])**2, axis=-1)
 
         if(negative):
             return 0.5 * chi2
