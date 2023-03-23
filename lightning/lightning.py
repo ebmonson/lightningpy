@@ -569,13 +569,33 @@ class Lightning:
             return -0.5 * chi2
 
 
-    def get_model_log_prob(self, params, negative=True, p_bound=np.inf):
+    def get_model_log_prob(self, params, priors=None, negative=True, p_bound=np.inf):
         '''
             Log-probability (eventaully, including prior probability) of the model under the
             given parameters.
 
             If `negative` flag is set (on by default), returns the negative log probability
             (i.e. chi2 / 2 + log(prior)).
+
+            Inputs
+            ------
+                params : np.ndarray(Nmodels, Nparams)
+                    An array of the parameters expected by the model. See ``Lightning.print_params()`` for
+                    details on the current model parameters.
+                priors : list of Nparams callables
+                    Priors on the parameters.
+                negative : bool
+                    A flag setting whether the log probability or its opposite is returned (as e.g. when using
+                    a minimization method). (Default: ``True``)
+                p_bound : float
+                    The magnitude of the log probability for models outside of the parameter space.
+                    (Default: ``np.inf``)
+
+            Returns
+            -------
+                log_prob : np.ndarray(Nmodels,)
+                    The log of the probability, prior * likelihood.
+
         '''
 
         if ((self.Lnu_obs is None) or (self.Lnu_unc is None)):
@@ -619,19 +639,42 @@ class Lightning:
         ob_mask = self.check_bounds(params)
         ib_mask = np.logical_not(ob_mask)
 
-        log_prob = np.zeros(Nmodels)
+        #log_prob = np.zeros(Nmodels)
 
-        if(negative):
-            log_prob = log_prob + p_bound
-        else:
-            log_prob = log_prob - p_bound
-
-
+        # Only bother doing the math if there's any math to do
         if(np.count_nonzero(ib_mask) > 0):
-            log_prob[ib_mask] = self.get_model_likelihood(params[ib_mask,:], negative=negative)
 
+            log_prior = np.zeros(Nmodels)
+            log_prior[ob_mask] = -1 * p_bound
 
-        return log_prob
+            if priors is not None:
+                assert (Nparams == len(priors)), "Number of priors (%d) does not match number of parameters in the model (%d)." % (len(priors), Nparams)
+                prior_arr = np.zeros((np.count_nonzero(ib_mask), Nparams))
+                for i,p in enumerate(priors):
+                    if p is not None:
+                        prior_arr[:,i] = p(params[ib_mask,i])
+                log_prior[ib_mask] = np.log(np.sum(prior_arr, axis=1))
+
+            log_like = np.zeros(Nmodels)
+
+            log_like[ib_mask] = self.get_model_likelihood(params[ib_mask,:], negative=False)
+
+            log_prob = log_like + log_prior
+
+            # print('log prior:', log_prior[0])
+            # print('log like:', log_like[0])
+
+        else:
+
+            log_prob = np.zeros(Nmodels) - p_bound
+
+        if (negative):
+
+            return -1 * log_prob
+
+        else:
+
+            return log_prob
 
     def check_bounds(self, params):
         '''
@@ -700,6 +743,7 @@ class Lightning:
 
         Ndim = self.Nparams
 
+        priors = kwargs['priors']
         Nwalkers = kwargs['Nwalkers']
         Nsteps = kwargs['Nsteps']
 
@@ -722,15 +766,16 @@ class Lightning:
                 xx = np.zeros((Nmodels, Ndim)) # in subsequent iterations, it does teams of N_walkers/2
                 xx[:,var_dim] = x
                 xx[:,const_dim] = const_vals
-                lnp = self.get_model_log_prob(xx, negative=False)
-                #print(xx[0,:], lnp[0])
+                lnp = self.get_model_log_prob(xx, priors=priors, negative=False)
+                # print('log prob:', lnp[0])
+                # print('parameters:', xx[0,:])
                 #print(lnp[:5])
                 #print(x.shape, lnp.shape)
                 return lnp
 
         else:
             def log_prob_func(x):
-                lnp = self.get_model_log_prob(x, negative=False)
+                lnp = self.get_model_log_prob(x, priors=priors, negative=False)
                 #print(lnp[:5])
                 return lnp
 
