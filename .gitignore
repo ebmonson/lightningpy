@@ -7,3 +7,5 @@ __pycache__
 testbench.ipynb
 *_test.ipynb
 *_test.py
+
+lightning/recycling_bin/

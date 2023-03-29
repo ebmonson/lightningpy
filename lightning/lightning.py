@@ -26,9 +26,11 @@ from astropy.utils.exceptions import AstropyUserWarning
 from astropy.table import Table
 from astropy.io import ascii
 # Lightning
-from .sfh import PiecewiseConstSFH, DelayedExponentialSFH
+from .sfh import PiecewiseConstSFH
+from .sfh.delayed_exponential import DelayedExponentialSFH
 from .stellar import StellarModel
-from .dust import modified_calzetti, DustModel, CalzettiAtten, ModifiedCalzettiAtten
+from .dust import DustModel
+from .attenuation.calzetti import CalzettiAtten, ModifiedCalzettiAtten
 from .get_filters import get_filters
 
 __all__ = ['Lightning']

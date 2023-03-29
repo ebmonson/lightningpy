@@ -1,12 +1,14 @@
 from .lightning import Lightning
+from .get_filters import get_filters
 from .stellar import StellarModel
-from .dust import modified_calzetti, CalzettiAtten, ModifiedCalzettiAtten, DustModel
-from .sfh import DelayedExponentialSFH, PiecewiseConstSFH
+from .attenuation.calzetti import CalzettiAtten, ModifiedCalzettiAtten
+from .sfh import PiecewiseConstSFH
+from .sfh.delayed_exponential import DelayedExponentialSFH
 
 __all__ = ['Lightning',
            'StellarModel',
            'DustModel',
-           'modified_calzetti',
+           'CalzettiAtten',
            'ModifiedCalzettiAtten',
            'DelayedExponentialSFH',
            'PiecewiseConstSFH']
