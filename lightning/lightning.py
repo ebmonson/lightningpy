@@ -330,7 +330,7 @@ class Lightning:
         else:
             raise ValueError("SFH type (%s) not understood." % (self.SFH_type))
 
-        self.stars = StellarModel(self.filter_labels, self.redshift, self.ages,
+        self.stars = StellarModel(self.filter_labels, self.redshift, age=self.ages,
                                   Z_met=0.020, step=step, wave_grid=self.wave_grid_rest)
 
 

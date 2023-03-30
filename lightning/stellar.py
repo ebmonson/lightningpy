@@ -4,11 +4,11 @@
     Stellar population modeling.
 '''
 
-import sys
-import os
+# import sys
+# import os
 import numpy as np
-import time as time_module
-from pathlib import Path
+#import time as time_module
+#from pathlib import Path
 
 #from astropy.io import fits
 import astropy.units as u
@@ -22,13 +22,15 @@ from scipy.io import readsav
 #from scipy import stats
 #import scipy.optimize as opt
 
+from .base import BaseEmissionModel
+
 __all__ = ['StellarModel']
 
 #################################
 # Build stellar pop'ns
 # from PEGASE
 #################################
-class StellarModel:
+class StellarModel(BaseEmissionModel):
     '''
         Stellar emission models (as of right now) generated using Pégase.
 
@@ -43,30 +45,18 @@ class StellarModel:
         added by hand.
     '''
 
-    #param_names = ['sfh']
-    #param_descr = ['Star formation history: as of right now this is an array giving SFR in solar masses yr-1 at each stellar age.']
+    model_name = 'Pegase-Stellar'
+    model_type = 'Stellar-Emission'
+    gridded = False
 
-    def __init__(self, filter_labels, redshift, age,
-                 step=True, Z_met=0.020, add_lines=True, wave_grid=None,
-                 path_to_filters=None, path_to_models=None):
+    def construct_model(self, age=None, step=True, Z_met=0.020, add_lines=True, wave_grid=None):
 
-        if (path_to_models is None):
-            self.path_to_models = str(Path(__file__).parent.resolve()) + '/models/04-single_burst/Kroupa01/'
-        else:
-            self.path_to_models = path_to_models
-            if(self.path_to_models[-1] != '/'): self.path_to_models = self.path_to_models + '/'
-
-
-        if (path_to_filters is None):
-            self.path_to_filters = str(Path(__file__).parent.resolve()) + '/filters/'
-        else:
-            self.path_to_filters = path_to_filters
-            if(self.path_to_filters[-1] != '/'): self.path_to_filters = self.path_to_filters + '/'
-
-        self.path_to_models = self.path_to_models + 'Kroupa01_Z%5.3f_nebular_spec.idl' % (Z_met)
+        self.path_to_models = self.path_to_models + '04-single_burst/Kroupa01/' + 'Kroupa01_Z%5.3f_nebular_spec.idl' % (Z_met)
+        if (age is None):
+            raise ValueError('Ages of stellar models must be specified.')
         self.age = age
-        self.redshift = redshift
-        self.filter_labels = filter_labels
+        #self.redshift = redshift
+        #self.filter_labels = filter_labels
         self.step = step
         self.metallicity = Z_met
 
@@ -121,7 +111,7 @@ class StellarModel:
 
             #dt = 5.e5 # Time resolution in years
             n_substeps = 100 # number of time divisions -- faster to do it this way, seemingly no loss of accuracy
-            t0 = time_module.time()
+            #t0 = time_module.time()
             for i in np.arange(Nbins):
 
                 if (i == Nbins - 1): dt = 1e6
@@ -148,7 +138,7 @@ class StellarModel:
 
             lnu_age = np.zeros((Nages, len(wave_model)), dtype='double') # Lnu(wave)
 
-            t0 = time_module.time()
+            #t0 = time_module.time()
 
             q0_age = np.interp(age, time, q0)
             lbol_age = np.interp(age, time, lbol)
@@ -158,7 +148,7 @@ class StellarModel:
             for j in np.arange(len(nu_model_obs)):
                 lnu_age[:,j] = np.interp(age, time, lnu_obs[j,:])
 
-        t1 = time_module.time()
+        #t1 = time_module.time()
 
         self.mstar = mstar_age
         self.Lbol = lbol_age
@@ -183,38 +173,6 @@ class StellarModel:
             self.nu_grid_rest = nu_model
             self.nu_grid_obs = self.nu_grid_rest * (1 + self.redshift)
             self.Lnu_obs = lnu_age
-
-        # Get filters
-        self.filters = dict()
-        for name in self.filter_labels:
-            self.filters[name] = np.zeros(len(self.wave_grid_rest), dtype='float')
-
-        self._get_filters()
-        self.Nfilters = len(self.filters)
-
-        self.wave_obs = np.zeros(len(self.filter_labels), dtype='float')
-        self._get_wave_obs()
-        self.nu_obs = c_um / self.wave_obs
-
-
-    def _get_filters(self):
-        '''
-            Load the filters.
-        '''
-
-        from .get_filters import get_filters
-
-        self.filters = get_filters(self.filter_labels, self.wave_grid_obs, self.path_to_filters)
-
-
-    def _get_wave_obs(self):
-        '''
-            Compute the mean wavelength of the normalized filters.
-        '''
-
-        for i, label in enumerate(self.filter_labels):
-            lam = trapz(self.wave_grid_obs * self.filters[label], self.wave_grid_obs)
-            self.wave_obs[i] = lam
 
 
     def get_model_lnu_hires(self, sfh, sfh_param, exptau=None, exptau_youngest=None, stepwise=False):

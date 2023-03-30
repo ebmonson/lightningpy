@@ -5,17 +5,16 @@
 
     Class interfaces for dust attenuation and emission modeling.
     Ported from IDL Lightning.
-
-    TODO:
-    - Update extrapolation of Calzetti curves to new method
 '''
 
-from pathlib import Path
+#from pathlib import Path
 import numpy as np
 from scipy.integrate import trapz
 from scipy.interpolate import interp1d
 import astropy.constants as const
 import astropy.units as u
+
+from .base import BaseEmissionModel
 
 __all__ = ['DustModel']
 
@@ -23,7 +22,7 @@ __all__ = ['DustModel']
 # Dust Emission
 #################################
 
-class DustModel:
+class DustModel(BaseEmissionModel):
     '''
         An implementation of the Draine & Li (2007) dust emission models.
 
@@ -35,6 +34,8 @@ class DustModel:
 
     Nparams = 5
     model_name = 'DL07-Dust'
+    model_type = 'Dust-Emission'
+    gridded = True
     param_names = ['dl07_dust_alpha', 'dl07_dust_U_min', 'dl07_dust_U_max', 'dl07_dust_gamma', 'dl07_dust_q_PAH']
     param_descr = ['Radiation field intensity distribution power law index',
                    'Radiation field minimum intensity',
@@ -47,26 +48,12 @@ class DustModel:
                              [0.0, 1.0],
                              [0.0047, 0.0458]])
 
-    def __init__(self, filter_labels, redshift,
-                 path_to_filters=None,
-                 path_to_models=None):
+    def construct_model(self):
+        '''
+            Load the models from various files.
+        '''
 
-        self.redshift = redshift
-        self.filter_labels = filter_labels
-
-        if (path_to_models is None):
-            self.path_to_models = str(Path(__file__).parent.resolve()) + '/models/dust/DL07/'
-        else:
-            self.path_to_models = path_to_models
-            if(self.path_to_models[-1] != '/'): self.path_to_models = self.path_to_models + '/'
-
-
-        if (path_to_filters is None):
-            self.path_to_filters = str(Path(__file__).parent.resolve()) + '/filters/'
-        else:
-            self.path_to_filters = path_to_filters
-            if(self.path_to_filters[-1] != '/'): self.path_to_filters = self.path_to_filters + '/'
-
+        self.path_to_models = self.path_to_models + 'dust/DL07/'
 
         self._U_grid = ['0.10','0.15','0.20','0.30','0.40','0.50','0.70','0.80',
                       '1.00','1.20','1.50','2.50','3.00','4.00', '5.00','7.00',
@@ -105,21 +92,14 @@ class DustModel:
         self.wave_grid_obs = (1 + self.redshift) * self.wave_grid_rest
         self.Lnu_obs = (1 + self.redshift) * self.Lnu_rest
 
-        # Get filters
-        self.filters = dict()
-        for name in self.filter_labels:
-            self.filters[name] = np.zeros(len(self.wave_grid_rest), dtype='float')
-
-        self._get_filters()
-        self.Nfilters = len(self.filters)
-
-        self.wave_obs = np.zeros(len(self.filter_labels), dtype='float')
-        self._get_wave_obs()
-        self.nu_obs = c_um / self.wave_obs
+    def construct_model_grid(self):
+        '''
+            Build the mean Lnu grid that we'll use to construct the spectra later.
+        '''
 
         Lnu_flat = self.Lnu_obs.reshape(-1, len(self.wave_grid_rest))
 
-        mean_Lnu = np.zeros((n_U * n_mod, self.Nfilters))
+        mean_Lnu = np.zeros((len(self._U_grid) * len(self._mod_grid), self.Nfilters))
 
         for i, filter_label in enumerate(self.filters):
 
@@ -129,45 +109,8 @@ class DustModel:
             mean_Lnu[:,i] = trapz(self.filters[filter_label][None,:] * Lnu_flat, self.wave_grid_obs, axis=1)
 
 
-        self.mean_Lnu = mean_Lnu.reshape(n_U, n_mod, self.Nfilters)
+        self.mean_Lnu = mean_Lnu.reshape(len(self._U_grid), len(self._mod_grid), self.Nfilters)
 
-
-    def _get_filters(self):
-        '''
-            Load the filters.
-        '''
-
-        from .get_filters import get_filters
-
-        self.filters = get_filters(self.filter_labels, self.wave_grid_obs, self.path_to_filters)
-
-
-    def _get_wave_obs(self):
-        '''
-            Compute the mean wavelength of the normalized filters.
-        '''
-
-        for i, label in enumerate(self.filter_labels):
-            lam = trapz(self.wave_grid_obs * self.filters[label], self.wave_grid_obs)
-            self.wave_obs[i] = lam
-
-    def check_bounds(self, params):
-        '''
-            Check that the parameters are within the ranges where the model is
-            meaningful and defined. Return the indices where the model
-            is out of bounds.
-        '''
-
-        if len(params.shape) == 1:
-            params = params.reshape(1,-1)
-
-        if self.Nparams is not None:
-            assert (self.Nparams == params.shape[1]), "Number of parameters must match the number (%d) expected by this model (%s)" % (self.Nparams, self.model_name)
-        Nmodels = params.shape[0]
-
-        ob_idcs = (params < self.param_bounds[:,0][None,:]) | (params > self.param_bounds[:,1][None,:])
-
-        return ob_idcs
 
     def get_model_lnu(self, params):
 
