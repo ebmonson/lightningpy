@@ -2,8 +2,10 @@ import numpy as np
 from scipy.interpolate import interp1d
 
 class AnalyticPrior():
-    '''
-        Base class for priors with a functional form.
+    '''Base class for priors with a functional form.
+
+    Need only be overwritten if there's specific requirements for the prior parameters
+    (i.e. b > a for the uniform prior).
     '''
 
     type = 'analytic'
@@ -14,10 +16,6 @@ class AnalyticPrior():
     param_bounds = np.array([None, None]).reshape(1,2)
 
     def __init__(self, params):
-        '''
-            Need only be overwritten if there's specific requirements for the prior parameters
-            (i.e. b > a for the uniform prior).
-        '''
 
         if self.Nparams is not None:
             assert (self.Nparams == len(params)), "Number of parameters must match the number (%d) expected by this model (%s)" % (self.Nparams, self.model_name)
@@ -33,14 +31,15 @@ class AnalyticPrior():
 
     def evaluate(self, x):
         '''
-            This function must be overwritten by each specific prior.
+        This function must be overwritten by each specific prior.
         '''
 
         return np.zeros_like(x)
 
 class TabulatedPrior():
-    '''
-        Base class for tabulated priors.
+    '''Base class for tabulated priors.
+
+    Keywords are passed on to scipy.interpolate.interp1d.
     '''
 
     type = 'tabulated'
@@ -51,15 +50,15 @@ class TabulatedPrior():
     params_bounds = np.array([None, None]).reshape(1,2)
 
     def __init__(self, x, y, **kwargs):
-        '''
-            Keywords are passed on to scipy.interpolate.interp1d
-        '''
 
         assert (len(x) == len(y)), "Number of probability values (%d) must match number of independent variable values (%d)." % (len(y), len(x))
 
         self.callable = interp1d(x, y, **kwargs)
 
     def evaluate(self, x):
+        '''
+            Evaluate the scipy.interpolate.interp1d object on ``x``.
+        '''
 
         return self.callable(x)
 

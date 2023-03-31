@@ -9,3 +9,5 @@ testbench.ipynb
 *_test.py
 
 lightning/recycling_bin/
+
+docs/build

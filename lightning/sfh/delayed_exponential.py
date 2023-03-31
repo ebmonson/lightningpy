@@ -31,7 +31,7 @@ class DelayedExponentialSFH(FunctionalSFH):
         '''
 
         # Check that the model is defined for the given parameters
-        ob = self.check_bounds(params)
+        ob = self._check_bounds(params)
         #ob = (np.any(params < self.param_bounds[:,0][None,:], axis=1) | np.any(params > self.param_bounds[:,1][None,:], axis=1))
         if (np.any(ob)):
             # Failing loudly vs quietly (and returning infs or nans or something)

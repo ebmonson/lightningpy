@@ -23,7 +23,7 @@ class FunctionalSFH:
         self.age = age
 
 
-    def check_bounds(self, params):
+    def _check_bounds(self, params):
         '''
             Check that the parameters are within the ranges where the model is
             meaningful and defined. Return the indices where the model
@@ -58,7 +58,7 @@ class FunctionalSFH:
             assert (self.Nparams == params.shape[1]), "Number of parameters must match the number (%d) expected by this model (%s)" % (self.Nparams, self.model_name)
         Nmodels = params.shape[0]
 
-        ob = self.check_bounds(params)
+        ob = self._check_bounds(params)
         if (np.any(ob)):
             raise ValueError('Given parameters are out of bounds for this model (%s).' % (self.model_name))
 
@@ -167,7 +167,7 @@ class PiecewiseConstSFH:
         self.param_bounds[:,1] = np.inf
 
 
-    def check_bounds(self, params):
+    def _check_bounds(self, params):
         '''
             Check that the parameters are within the ranges where the model is
             meaningful and defined. Return the indices where the model
@@ -198,7 +198,7 @@ class PiecewiseConstSFH:
         '''
 
         # Check that the model is defined for the given parameters
-        ob = self.check_bounds(params)
+        ob = self._check_bounds(params)
         #ob = (np.any(params < self.param_bounds[:,0][None,:], axis=1) | np.any(params > self.param_bounds[:,1][None,:], axis=1))
         if (np.any(ob)):
             # Failing loudly vs quietly (and returning infs or nans or something)
@@ -251,6 +251,10 @@ class PiecewiseConstSFH:
 
 
     def sum(self, params, arr, min_age=None, max_age=None, cumulative=False):
+        '''
+            All-purpose function for weighting and summing the spectrum,
+            stellar mass, etc. of a stellar population model.
+        '''
 
         if len(params.shape) == 1:
             params = params.reshape(1,-1)

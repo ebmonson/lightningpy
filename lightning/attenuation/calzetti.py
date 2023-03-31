@@ -44,7 +44,7 @@ class CalzettiAtten(AnalyticAtten):
         Nmodels = params_shape[0]
         assert (self.Nparams == params_shape[1]), "Number of parameters must match the number (%d) expected by this model (%s)" % (self.Nparams, self.model_name)
 
-        ob = self.check_bounds(params)
+        ob = self._check_bounds(params)
         if (np.any(ob)):
             raise ValueError('Given parameters are out of bounds for this model (%s).' % (self.model_name))
 
@@ -124,7 +124,7 @@ class ModifiedCalzettiAtten(AnalyticAtten):
         Nmodels = params_shape[0]
         assert (self.Nparams == params_shape[1]), "Number of parameters must match the number (%d) expected by this model (%s)" % (self.Nparams, self.model_name)
 
-        ob = self.check_bounds(params)
+        ob = self._check_bounds(params)
         if (np.any(ob)):
             raise ValueError('Given parameters are out of bounds for this model (%s).' % (self.model_name))
 

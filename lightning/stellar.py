@@ -4,23 +4,14 @@
     Stellar population modeling.
 '''
 
-# import sys
-# import os
 import numpy as np
-#import time as time_module
-#from pathlib import Path
 
-#from astropy.io import fits
 import astropy.units as u
 import astropy.constants as const
-#from astropy.table import Table
-#import pysynphot as SP
 
 from scipy.interpolate import interp1d
 from scipy.integrate import trapz
 from scipy.io import readsav
-#from scipy import stats
-#import scipy.optimize as opt
 
 from .base import BaseEmissionModel
 
@@ -31,25 +22,72 @@ __all__ = ['StellarModel']
 # from PEGASE
 #################################
 class StellarModel(BaseEmissionModel):
-    '''
-        Stellar emission models (as of right now) generated using Pégase.
+    '''Stellar emission models generated using Pégase.
 
-        These models are either:
-            - A single burst of star formation at 1 solar mass yr-1, evaluated
-              on a grid of specified ages
-            - A binned stellar population, representing a constant epoch of star
-              formation in a specified set of stellar age bins. These models are
-              integrated from the above.
+    These models are either:
+    
+        - A single burst of star formation at 1 solar mass yr-1, evaluated
+          on a grid of specified ages
+        - A binned stellar population, representing a constant epoch of star
+          formation in a specified set of stellar age bins. These models are
+          integrated from the above.
 
-        Nebular extinction + continuum are included by default, lines are optional,
-        added by hand.
+    Nebular extinction + continuum are included by default, lines are optional,
+    added by hand.
+
+    Parameters
+    ----------
+    filter_labels : list, str
+        List of filter labels.
+    redshift : float
+        Redshift of the model.
+    age : np.ndarray, (Nsteps + 1,) or (Nages,), float
+        Either the bounds of ``Nsteps`` age bins for a piecewise-constant
+        SFH model, or ``Nages`` stellar ages for a continuous SFH model.
+    step : bool
+        If ``True``, ``age`` is interpreted as age bounds for a piecewise-constant
+        SFH model. Otherwise ``age`` is interpreted as the age grid for a continuous SFH.
+    Z_met : {0.001, 0.004, 0.008, 0.020, 0.050, 0.100}
+        The metallicity of the stellar model. For the Pégase models, only the above metallicities
+        are available.
+    add_lines : bool
+        If ``True``, emission lines are added to the spectral models at ages ``< 1e7`` yr.
+    wave_grid : np.ndarray, (Nwave,), float, optional
+        If set, the spectra are interpreted to this wavelength grid.
+
+    Attributes
+    ----------
+    filter_labels
+    redshift
+    age
+    step
+    metallicity
+    mstar : np.ndarray, (Nages,), float
+        Surviving stellar mass as a function of age.
+    Lbol : np.ndarray, (Nages,), float
+        Bolometric luminosity as a function of age.
+    q0 : np.ndarray, (Nages,), float
+        Lyman-continuum photon production rate (yr-1) as a function of age.
+    wave_grid_rest : np.ndarray, (Nwave,), float
+        Rest-frame wavelength grid.
+    wave_grid_obs
+    nu_grid_rest
+    nu_grid_obs
+    Lnu_obs : np.ndarray, (Nages, Nwave), float
+        ``(1 + redshift)`` times the rest-frame spectral model,
+        as a function of age.
+
     '''
 
     model_name = 'Pegase-Stellar'
     model_type = 'Stellar-Emission'
     gridded = False
 
-    def construct_model(self, age=None, step=True, Z_met=0.020, add_lines=True, wave_grid=None):
+    def _construct_model(self, age=None, step=True, Z_met=0.020, add_lines=True, wave_grid=None):
+        '''
+            Load the appropriate models from the IDL files Rafael creates and either integrate
+            them in bins (if ``step==True``) or interpolate them to an age grid otherwise.
+        '''
 
         self.path_to_models = self.path_to_models + '04-single_burst/Kroupa01/' + 'Kroupa01_Z%5.3f_nebular_spec.idl' % (Z_met)
         if (age is None):
@@ -176,6 +214,38 @@ class StellarModel(BaseEmissionModel):
 
 
     def get_model_lnu_hires(self, sfh, sfh_param, exptau=None, exptau_youngest=None, stepwise=False):
+        '''Construct the high-res stellar spectrum.
+
+        Given a SFH instance and set of parameters, the corresponding high-resolution spectrum
+        is constructed. Optionally, attenuation is applied and the attenuated power is returned.
+
+        Parameters
+        ----------
+        sfh : instance of lightning.sfh.PiecewiseConstSFH or lightning.sfh.FunctionalSFH
+            Star formation history model.
+        sfh_params : np.ndarray, (Nmodels, Nparam) or (Nparam,), float32
+            Parameters for the star formation history.
+        exptau : np.ndarray, (Nmodels, Nwave) or (Nwave,), float32
+            ``exp(-tau)`` as a function of wavelength. If this is 2D, the
+            size of the first dimension must match the size of the first
+            dimension of ``sfh_params``.
+        exptau_youngest : np.ndarray, (Nmodels, Nwave) or (Nwave,), float32
+            This doesn't do anything at the moment, until I figure out how
+            to flexibly decide which ages to apply the birth cloud attenuation to.
+        stepwise : bool
+            If true, the spectrum is returned as a function of stellar age.
+
+        Returns
+        -------
+        lnu_attenuated : np.ndarray, (Nmodels, Nwave), (Nmodels, Nages, Nwave), or (Nwave,), float32
+            The stellar spectrum as seen after the application of the ISM dust
+            attenuation model.
+        lnu_unattenuated : np.ndarray, (Nmodels, Nwave), (Nmodels, Nages, Nwave), or (Nwave,), float32
+            The intrinsic stellar spectrum.
+        L_TIR : np.ndarray, (Nmodels,) or (Nmodels, Nages)
+            The total attenuated power of the stellar population.
+
+        '''
 
         # sfh_shape = sfh.shape # expecting ndarray(Nmodels, n_steps)
         if (len(sfh_param.shape) == 1):
@@ -260,6 +330,39 @@ class StellarModel(BaseEmissionModel):
 
 
     def get_model_lnu(self, sfh, sfh_param, exptau=None, exptau_youngest=None, stepwise=False):
+        '''Construct the stellar SED as observed in the given filters.
+
+        Given a SFH instance and set of parameters, the corresponding high-resolution spectrum
+        is constructed and convolved with the filters. Optionally, attenuation is applied and
+        the attenuated power is returned.
+
+        Parameters
+        ----------
+        sfh : instance of lightning.sfh.PiecewiseConstSFH or lightning.sfh.FunctionalSFH
+            Star formation history model.
+        sfh_params : np.ndarray, (Nmodels, Nparam) or (Nparam,), float32
+            Parameters for the star formation history.
+        exptau : np.ndarray, (Nmodels, Nwave) or (Nwave,), float32
+            ``exp(-tau)`` as a function of wavelength. If this is 2D, the
+            size of the first dimension must match the size of the first
+            dimension of ``sfh_params``.
+        exptau_youngest : np.ndarray, (Nmodels, Nwave) or (Nwave,), float32
+            This doesn't do anything at the moment, until I figure out how
+            to flexibly decide which ages to apply the birth cloud attenuation to.
+        stepwise : bool
+            If true, the spectrum is returned as a function of stellar age.
+
+        Returns
+        -------
+        lnu_attenuated : np.ndarray, (Nmodels, Nfilters), (Nmodels, Nages, Nfilters), or (Nfilters,), float32
+            The stellar spectrum as seen after the application of the ISM dust
+            attenuation model.
+        lnu_unattenuated : np.ndarray, (Nmodels, Nfilters), (Nmodels, Nages, Nfilters), or (Nfilters,), float32
+            The intrinsic stellar spectrum.
+        L_TIR : np.ndarray, (Nmodels,) or (Nmodels, Nages)
+            The total attenuated power of the stellar population.
+
+        '''
 
         # sfh_shape = sfh.shape # expecting ndarray(Nmodels, Nages)
         #

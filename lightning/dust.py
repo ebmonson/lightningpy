@@ -7,7 +7,6 @@
     Ported from IDL Lightning.
 '''
 
-#from pathlib import Path
 import numpy as np
 from scipy.integrate import trapz
 from scipy.interpolate import interp1d
@@ -23,13 +22,40 @@ __all__ = ['DustModel']
 #################################
 
 class DustModel(BaseEmissionModel):
-    '''
-        An implementation of the Draine & Li (2007) dust emission models.
+    '''An implementation of the Draine & Li (2007) dust emission models.
 
-        A portion gamma of the dust is exposed to a radiation field such
-        that the mass of dust dM exposed to a range of intensities [U, U + dU] is
-        dM propto U ^ (-alpha) dU, where U is in [Umin, Umax]. The remaining portion
-        (1 - gamma) is exposed to a radiation field with intensity Umin.
+    A fraction ``gamma`` of the dust is exposed to a radiation field such
+    that the mass of dust ``dM`` exposed to a range of intensities ``[U, U + dU]`` is::
+
+        dM = const * U ^ (-alpha) dU,
+
+    where ``U`` is in ``[Umin, Umax]``. The remaining portion
+    ``(1 - gamma)`` is exposed to a radiation field with intensity ``Umin``.
+
+    Parameters
+    ----------
+    filter_labels : list, str
+        List of filter labels.
+    redshift : float
+        Redshift of the model.
+
+    Attributes
+    ----------
+    Lnu_rest : numpy.ndarray, (29, 7, 132), float
+        High-res spectral model grid. First dimension covers U, the second q_PAH,
+        and the third covers wavelength.
+    Lnu_obs : numpy.ndarray, (29, 7, 132), float
+        ``(1 + redshift) * Lnu_rest``
+    mean_Lnu : numpy.ndarray, (29, 7, Nfilters), float
+        The ``Lnu_obs`` grid integrated against the filters.
+    Lbol : numpy.ndarray, (29, 7), float
+        Total luminosity of each model in the grid.
+    wave_grid_rest : numpy.ndarray, (132,), float
+        Rest-frame wavelength grid for the models.
+    wave_grid_obs
+    nu_grid_rest
+    nu_grid_obs
+
     '''
 
     Nparams = 5
@@ -48,7 +74,7 @@ class DustModel(BaseEmissionModel):
                              [0.0, 1.0],
                              [0.0047, 0.0458]])
 
-    def construct_model(self):
+    def _construct_model(self):
         '''
             Load the models from various files.
         '''
@@ -92,7 +118,7 @@ class DustModel(BaseEmissionModel):
         self.wave_grid_obs = (1 + self.redshift) * self.wave_grid_rest
         self.Lnu_obs = (1 + self.redshift) * self.Lnu_rest
 
-    def construct_model_grid(self):
+    def _construct_model_grid(self):
         '''
             Build the mean Lnu grid that we'll use to construct the spectra later.
         '''
@@ -112,61 +138,25 @@ class DustModel(BaseEmissionModel):
         self.mean_Lnu = mean_Lnu.reshape(len(self._U_grid), len(self._mod_grid), self.Nfilters)
 
 
-    def get_model_lnu(self, params):
-
-        param_shape = params.shape # expecting ndarray(Nmodels, Nparams)
-        if (len(param_shape) == 1):
-            params = params.reshape(1, params.size)
-            param_shape = params.shape
-
-
-        Nmodels = param_shape[0]
-        Nparams_in = param_shape[1]
-
-        assert (self.Nparams == Nparams_in), 'The dust model has 5 parameters'
-
-        ob = self.check_bounds(param)
-        if(np.any(ob)):
-            raise ValueError('Given parameters are out of bounds for this model (%s).' % (self.model_name))
-
-        #Lbol = np.zeros(Nmodels, len(self._U_grid))
-        #Lnu = np.zeros(Nmodels, self.Nfilters, len(self._U_grid))
-
-        finterp_Lbol_qPAH = interp1d(self._qPAH_grid, self.Lbol, axis=1)
-        Lbol = finterp_Lbol_qPAH(params[:,4]) # ndarray(len(self._U_grid), Nmodels)
-        finterp_Lnu_qPAH = interp1d(self._qPAH_grid, self.mean_Lnu, axis=1)
-        Lnu = finterp_Lnu_qPAH(params[:,4]) # ndarray(len(self._U_grid), Nmodels, Nfilters)
-
-        # Power law component U^(-alpha)
-        U_float = np.array(self._U_grid, dtype='float')
-        plaw = U_float[:,None] ** (-1 * params[:,0]) # ndarray(len(self._U_grid), Nmodels)
-        # For each model, zero out power law outside of [U_min, U_max]
-        mask = (U_float[:,None] < params[:,1]) | (U_float[:,None] > params[:,2])
-        plaw[mask] = 0
-        plaw = plaw / trapz(plaw, U_float, axis=0) # Normalize
-
-        Lbol_pow = params[:,3] * trapz(plaw * Lbol, U_float, axis=0)
-        Lnu_pow = params[:,3][:,None] * trapz(plaw[:,:,None] * Lnu, U_float, axis=0)
-
-        # Delta function component U_max = U_min
-        Lbol_delta = np.zeros(Nmodels)
-        Lnu_delta = np.zeros((Nmodels, self.Nfilters))
-        # Should be able to do this without the loop but I haven't figured out the correct index trickery
-        for i in np.arange(Nmodels):
-            finterp_Lbol_U = interp1d(U_float, Lbol[:,i], axis=0)
-            #Lbol_delta = (1 - params[:,3]) * finterp_Lbol_U(params[:,1]) # ndarray(Nmodels)
-            Lbol_delta[i] = finterp_Lbol_U(params[i,1]) # ndarray(Nmodels)
-            finterp_Lnu_U = interp1d(U_float, Lnu[:,i,:], axis=0)
-            # Lnu_delta = (1 - params[:,3])[:,None] * finterp_Lnu_U(params[:,1])
-            Lnu_delta[i,:] = finterp_Lnu_U(params[i,1])
-
-        Lnu_obs = Lnu_pow + Lnu_delta
-        Lbol = Lbol_pow + Lbol_delta
-
-        return Lnu_obs, Lbol
-
-
     def get_model_lnu_hires(self, params):
+        '''Construct the high-resolution dust SED.
+
+        Given a set of parameters, the high-resolution spectrum
+        is constructed.
+
+        Parameters
+        ----------
+        params : np.ndarray, (Nmodels, 5) or (5,) float32
+            The dust model parameters.
+
+        Returns
+        -------
+        Lnu_obs : np.ndarray, (Nmodels, Nwave), (Nmodels, Nages, Nwave), or (Nwave,), float32
+            The dust spectrum as seen through the given filters
+        Lbol : np.ndarray, (Nmodels,) or (Nmodels, Nages)
+            The total luminosity of the dust model.
+
+        '''
 
         param_shape = params.shape # expecting ndarray(Nmodels, Nparams)
         if (len(param_shape) == 1):
@@ -179,7 +169,7 @@ class DustModel(BaseEmissionModel):
 
         assert (self.Nparams == Nparams_in), 'The dust model has 5 parameters'
 
-        ob = self.check_bounds(params)
+        ob = self._check_bounds(params)
         if(np.any(ob)):
             raise ValueError('Given parameters are out of bounds for this model (%s).' % (self.model_name))
 
@@ -213,6 +203,78 @@ class DustModel(BaseEmissionModel):
             # Lnu_delta = (1 - params[:,3])[:,None] * finterp_Lnu_U(params[:,1])
             Lnu_delta[i,:] = finterp_Lnu_U(params[i,1])
 
+
+        Lnu_obs = Lnu_pow + Lnu_delta
+        Lbol = Lbol_pow + Lbol_delta
+
+        return Lnu_obs, Lbol
+
+
+    def get_model_lnu(self, params):
+        '''Construct the dust SED as observed in the given filters.
+
+        Given a set of parameters, the corresponding high-resolution spectrum
+        is constructed and convolved with the filters.
+
+        Parameters
+        ----------
+        params : np.ndarray, (Nmodels, 5) or (5,) float32
+            The dust model parameters.
+
+        Returns
+        -------
+        Lnu_obs : np.ndarray, (Nmodels, Nfilters), (Nmodels, Nages, Nfilters), or (Nfilters,), float32
+            The dust spectrum as seen through the given filters
+        Lbol : np.ndarray, (Nmodels,) or (Nmodels, Nages)
+            The total luminosity of the dust model.
+
+        '''
+
+        param_shape = params.shape # expecting ndarray(Nmodels, Nparams)
+        if (len(param_shape) == 1):
+            params = params.reshape(1, params.size)
+            param_shape = params.shape
+
+
+        Nmodels = param_shape[0]
+        Nparams_in = param_shape[1]
+
+        assert (self.Nparams == Nparams_in), 'The dust model has 5 parameters'
+
+        ob = self._check_bounds(params)
+        if(np.any(ob)):
+            raise ValueError('Given parameters are out of bounds for this model (%s).' % (self.model_name))
+
+        #Lbol = np.zeros(Nmodels, len(self._U_grid))
+        #Lnu = np.zeros(Nmodels, self.Nfilters, len(self._U_grid))
+
+        finterp_Lbol_qPAH = interp1d(self._qPAH_grid, self.Lbol, axis=1)
+        Lbol = finterp_Lbol_qPAH(params[:,4]) # ndarray(len(self._U_grid), Nmodels)
+        finterp_Lnu_qPAH = interp1d(self._qPAH_grid, self.mean_Lnu, axis=1)
+        Lnu = finterp_Lnu_qPAH(params[:,4]) # ndarray(len(self._U_grid), Nmodels, Nfilters)
+
+        # Power law component U^(-alpha)
+        U_float = np.array(self._U_grid, dtype='float')
+        plaw = U_float[:,None] ** (-1 * params[:,0]) # ndarray(len(self._U_grid), Nmodels)
+        # For each model, zero out power law outside of [U_min, U_max]
+        mask = (U_float[:,None] < params[:,1]) | (U_float[:,None] > params[:,2])
+        plaw[mask] = 0
+        plaw = plaw / trapz(plaw, U_float, axis=0) # Normalize
+
+        Lbol_pow = params[:,3] * trapz(plaw * Lbol, U_float, axis=0)
+        Lnu_pow = params[:,3][:,None] * trapz(plaw[:,:,None] * Lnu, U_float, axis=0)
+
+        # Delta function component U_max = U_min
+        Lbol_delta = np.zeros(Nmodels)
+        Lnu_delta = np.zeros((Nmodels, self.Nfilters))
+        # Should be able to do this without the loop but I haven't figured out the correct index trickery
+        for i in np.arange(Nmodels):
+            finterp_Lbol_U = interp1d(U_float, Lbol[:,i], axis=0)
+            #Lbol_delta = (1 - params[:,3]) * finterp_Lbol_U(params[:,1]) # ndarray(Nmodels)
+            Lbol_delta[i] = finterp_Lbol_U(params[i,1]) # ndarray(Nmodels)
+            finterp_Lnu_U = interp1d(U_float, Lnu[:,i,:], axis=0)
+            # Lnu_delta = (1 - params[:,3])[:,None] * finterp_Lnu_U(params[:,1])
+            Lnu_delta[i,:] = finterp_Lnu_U(params[i,1])
 
         Lnu_obs = Lnu_pow + Lnu_delta
         Lbol = Lbol_pow + Lbol_delta

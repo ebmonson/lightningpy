@@ -42,7 +42,7 @@ class BaseEmissionModel():
             if(self.path_to_filters[-1] != '/'): self.path_to_filters = self.path_to_filters + '/'
 
         # Build the actual model
-        self.construct_model(**kwargs)
+        self._construct_model(**kwargs)
         self.wave_grid_obs = (1 + self.redshift) * self.wave_grid_rest
 
         # Get filters
@@ -50,13 +50,13 @@ class BaseEmissionModel():
         for name in self.filter_labels:
             self.filters[name] = np.zeros(len(self.wave_grid_rest), dtype='float')
 
-        self.get_filters()
+        self._get_filters()
         self.Nfilters = len(self.filters)
 
         c_um = const.c.to(u.micron / u.s).value
 
         self.wave_obs = np.zeros(len(self.filter_labels), dtype='float')
-        self.get_wave_obs()
+        self._get_wave_obs()
         self.nu_obs = c_um / self.wave_obs
 
         self.nu_grid_rest = c_um / self.wave_grid_rest
@@ -66,10 +66,10 @@ class BaseEmissionModel():
         # only necessary for gridded models, hence the name.
         if (self.gridded):
 
-            self.construct_model_grid()
+            self._construct_model_grid()
 
 
-    def construct_model(self, **kwargs):
+    def _construct_model(self, **kwargs):
         '''
             Build the model from the appropriate files, a function, whatever.
             Here, this just defines a default rest-frame wavelength grid.
@@ -79,7 +79,7 @@ class BaseEmissionModel():
         self.Lnu_rest = 0 * self.wave_grid_rest
         self.Lnu_obs = (1 + self.redshift) * self.Lnu_rest
 
-    def construct_model_grid(self, **kwargs):
+    def _construct_model_grid(self, **kwargs):
         '''
             For some of the models we'll need to arrange the constructed models
             into N-D arrays for later interpolation.
@@ -87,14 +87,14 @@ class BaseEmissionModel():
 
         raise NotImplementedError('Implemented by child class.')
 
-    def get_filters(self):
+    def _get_filters(self):
         '''
             Load the filters.
         '''
 
         self.filters = get_filters(self.filter_labels, self.wave_grid_obs, self.path_to_filters)
 
-    def get_wave_obs(self):
+    def _get_wave_obs(self):
         '''
             Compute the mean wavelength of the normalized filters.
         '''
@@ -103,7 +103,7 @@ class BaseEmissionModel():
             lam = trapz(self.wave_grid_obs * self.filters[label], self.wave_grid_obs)
             self.wave_obs[i] = lam
 
-    def check_bounds(self, params):
+    def _check_bounds(self, params):
         '''
             Check that the parameters are within the ranges where the model is
             meaningful and defined. Return the indices where the model

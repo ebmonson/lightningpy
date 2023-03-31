@@ -21,7 +21,7 @@ class AnalyticAtten:
         self.wave = wave
         self.Nwave = len(self.wave)
 
-    def check_bounds(self, params):
+    def _check_bounds(self, params):
         '''
             Check that the parameters are within the ranges where the model is
             meaningful and defined. Return the indices where the model
@@ -52,7 +52,7 @@ class AnalyticAtten:
         if len(params.shape) == 1:
             params = params.reshape(1,-1)
 
-        ob = self.check_bounds(params)
+        ob = self._check_bounds(params)
         if (np.any(ob)):
             raise ValueError('Given parameters are out of bounds for this model (%s).' % (self.model_name))
 

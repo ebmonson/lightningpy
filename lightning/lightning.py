@@ -1,14 +1,10 @@
 #!/usr/bin/env python
 
-'''
-    lightning.py
-
-    Define an object-oriented interface for calling lightning.
+'''An object-oriented interface for Lightning.
 
     TODO:
     - Add optical-IR AGN model
     - Whole X-ray thing
-    - Update and homogenize documentation
 '''
 
 # Standard library
@@ -36,32 +32,79 @@ from .get_filters import get_filters
 __all__ = ['Lightning']
 
 class Lightning:
-    '''
-        An interface for estimating the likelihood of an SED model.
-        Holds information about the filters, observed flux, type of model.
-        The goal is to have one object for an entire fitting process and to
-        call some kind of method, like Lightning.fit(p0, method='mcmc') to produce
-        the best fit or sample the distributions.
+    '''An interface for estimating the likelihood of an SED model.
 
-        Attributes:
-            flux_obs: numpy ndarray, (Nfilters,), float32
-                Observed flux in ... units
-            flux_obs_unc: numpy ndarray, (Nfilters,), float32
-                Error in observed flux in ... units
-            wave_grid: numpy ndarray, (npoints,), float32
-                Wavelength grid on which model is evaluated.
-                Calculations are done with wavelength in microns.
-            filter_labels: list, str
-                List of filter labels.
-            filters: dict, len=Nfilters, float32
-                A dict of numpy float32 arrays. The keys are *filter_labels* and the
-                values correspond to the normalized transmission evaluated on
-                *wave_grid*.
-            wave_obs: numpy ndarray, (Nfilters,), float32
-                Mean wavelength of the the supplied filters.
-            path_to_filters: str
-                The path (relative or absolute, should just make it absolute) to the
-                top filter directory.
+    Holds information about the filters, observed flux, type of model.
+    The goal is to have one object for an entire fitting process and to
+    call some kind of method, like ``Lightning.fit(p0, method='mcmc')`` to produce
+    the best fit or sample the distributions.
+
+    Parameters
+    ----------
+    filter_labels : list, str
+        List of filter labels.
+    redshift : float
+        Redshift of the model. If set, ``lum_dist`` is ignored.
+    lum_dist : float
+        Luminosity distance to the model. If ``redshift`` is not set,
+        this parameter must be. If a luminosity distance is provided
+        instead of a redshift, the redshift is set to 0 (as we assume
+        the galaxy is very nearby).
+    flux_obs : np.ndarray, (Nfilters,) or (Nfilters, 2), float32, optional
+        The observed flux densities in mJy, or, optionally, the
+        observed flux densities and associated uncertainties as a
+        2D array.
+    flux_unc : np.ndarray, (Nfilters,), float32, optional
+        The uncertainties associated with ``flux_obs``.
+    wave_grid : tuple (3,), or np.ndarray, (Nwave,), float32, optional
+        Either a tuple specifying a log-spaced wavelength grid, or an array
+        giving the wavelengths.
+    SFH_type : {'Piecewise-Constant', 'Delayed-Exponential'}
+        String specifying the SFH type to use.
+    ages : np.ndarray, (Nages,), float32
+        Array giving the stellar ages (or stellar age bins) of the stellar
+        population models.
+    atten_type : {'Modified-Calzetti', 'Calzetti'}
+        String specifying the dust attenuation model to use.
+    dust_emission : bool
+        If ``True``, a Draine & Li (2007) dust emission model is included,
+        in energy balance with the attenuated power.
+    lightning_filter_path : str
+        Path to lightning filters. Not actually used.
+    print_setup_time : bool
+        If ``True``, the setup time will be printed.
+    cosmology : astropy.cosmology.FlatLambdaCDM
+        The cosmology to assume.
+
+    Attributes
+    ----------
+    flux_obs
+    flux_unc
+    Lnu_obs : None or numpy.ndarray, (Nfilters,), float32
+        Observed-frame luminosity densities, converted from the given fluxes.
+    Lnu_unc : None or numpy.ndarray, (Nfilters,), float32
+        Uncertainties associated with ``Lnu_obs``.
+    filter_labels : list, str
+        List of filter labels.
+    filters : dict, len=Nfilters, float32
+        A dict of numpy float32 arrays. The keys are *filter_labels* and the
+        values correspond to the normalized transmission evaluated on
+        *wave_grid*.
+    wave_obs : numpy.ndarray, (Nfilters,), float32
+        Mean wavelength of the the supplied filters.
+    redshift : float
+        Redshift of the model. Assumed to be 0 if `lum_dist` was set.
+    DL : float
+        Luminosity distance to the model, in Mpc
+    wave_grid_rest : numpy.ndarray, (Nwave,), float32
+        Unified rest-frame wavelength grid for the models.
+    wave_grid_obs
+    nu_grid_rest
+    nu_grid_obs
+    path_to_filters : str
+        The path (relative or absolute, should just make it absolute) to the
+        top filter directory.
+
     '''
 
     def __init__(self, filter_labels,
@@ -236,6 +279,11 @@ class Lightning:
 
     @property
     def flux_obs(self):
+        '''Observed flux-densities in mJy.
+
+        Flux densities are converted to observed-frame
+        luminosity densities.
+        '''
         return self._flux_obs
 
 
@@ -264,6 +312,11 @@ class Lightning:
 
     @property
     def flux_unc(self):
+        '''Uncertainties associated with ``flux_obs``.
+
+        Flux densities are converted to observed-frame
+        luminosity densities.
+        '''
         return self._flux_unc
 
 
@@ -279,19 +332,12 @@ class Lightning:
 
     def _fnu_to_Lnu(self, flux):
         '''
-            Convert fnu in mJy to Lnu in Lsun Hz-1
+        Helper function to convert fnu in mJy to Lnu in Lsun Hz-1
         '''
 
         Mpc_to_cm = u.Mpc.to(u.cm)
         mJy_to_cgs = 1e-26
         cgs_to_Lsun = (u.erg / u.s /u.Hz).to(u.solLum / u.Hz)
-
-        # DL = self.cosmology.luminosity_distance(self.redshift).value
-        #
-        # if (DL < 10):
-        #     warnings.warn('Redshift results in a luminosity distance less than 10 Mpc. Setting DL to 10 Mpc to convert flux/uncertainty to Lnu.',
-        #                    AstropyUserWarning)
-        #     DL = 10
 
         FtoL = 4 * np.pi * (self.DL * Mpc_to_cm) ** 2 * mJy_to_cgs * cgs_to_Lsun
 
@@ -300,7 +346,7 @@ class Lightning:
 
     def _get_filters(self):
         '''
-            Load the filters.
+        Load the filters.
         '''
 
         self.filters = get_filters(self.filter_labels, self.wave_grid_obs, self.path_to_filters)
@@ -308,7 +354,7 @@ class Lightning:
 
     def _get_wave_obs(self):
         '''
-            Compute the mean wavelength of the normalized filters.
+        Compute the mean wavelength of the normalized filters.
         '''
 
         for i, label in enumerate(self.filter_labels):
@@ -318,7 +364,7 @@ class Lightning:
 
     def _setup_stellar(self):
         '''
-            Initialize SFH model and stellar population.
+        Initialize SFH model and stellar population.
         '''
 
         if (self.SFH_type == 'Piecewise-Constant'):
@@ -336,7 +382,7 @@ class Lightning:
 
     def _setup_dust_att(self):
         '''
-            Initialize dust attenuation model.
+        Initialize dust attenuation model.
         '''
 
         if (self.atten_type == 'Calzetti'):
@@ -350,17 +396,18 @@ class Lightning:
 
     def _setup_dust_em(self):
         '''
-            Initialize dust emission model.
+        Initialize dust emission model.
         '''
 
         self.dust = DustModel(self.filter_labels, self.redshift)
 
     def print_params(self, verbose=False):
-        '''
-            If `verbose`, print a nicely formatted table
-            of the models, their parameters, and the description
-            of the parameters.
-            Otherwise, just print the names of the parameters.
+        '''Print all the parameters of the current model.
+
+        If ``verbose``, print a nicely formatted table
+        of the models, their parameters, and the description
+        of the parameters.
+        Otherwise, just print the names of the parameters.
         '''
 
         if (verbose):
@@ -387,27 +434,25 @@ class Lightning:
 
 
     def get_model_lnu_hires(self, params, stepwise=False):
-        '''
-            Construct the high-resolution spectral model.
+        '''Construct the high-resolution spectral model.
 
-            Inputs
-            ------
-                params : np.ndarray(Nmodels, Nparams) or np.ndarray(Nparams)
-                    An array of model parameters. For purposes of vectorization
-                    this can be a 2D array, where the first dimension cycles over
-                    different sets of parameters.
+        Parameters
+        ----------
+        params : np.ndarray(Nmodels, Nparams) or np.ndarray(Nparams)
+            An array of model parameters. For purposes of vectorization
+            this can be a 2D array, where the first dimension cycles over
+            different sets of parameters.
+        stepwise : bool
+            If true, this function returns the spectral model as a function
+            of stellar age.
 
-                stepwise : bool
-                    If true, this function returns the spectral model as a function
-                    of stellar age.
+        Returns
+        -------
+        lnu_processed : np.ndarray(Nmodels, Nwave) or np.ndarray(Nmodels, Nwave, Nages)
+            High resolution spectral model including the effects of ISM dust.
+        lnu_intrinsic : np.ndarray(Nmodels, Nwave) or np.ndarray(Nmodels, Nwave, Nages)
+            High resolution spectral model not including the effects of ISM dust.
 
-            Returns
-            -------
-                lnu_processed : np.ndarray(Nmodels, Nwave) or np.ndarray(Nmodels, Nwave, Nages)
-                    High resolution spectral model including the effects of ISM dust.
-
-                lnu_intrinsic : np.ndarray(Nmodels, Nwave) or np.ndarray(Nmodels, Nwave, Nages)
-                    High resolution spectral model not including the effects of ISM dust.
         '''
 
         #sfh_shape = sfh.shape # expecting ndarray(Nmodels, Nsteps)
@@ -489,27 +534,25 @@ class Lightning:
 
 
     def get_model_lnu(self, params, stepwise=False):
-        '''
-            Construct the low-resolution SED model.
+        '''Construct the low-resolution SED model.
 
-            Inputs
-            ------
-                params : np.ndarray(Nmodels, Nparams) or np.ndarray(Nparams)
-                    An array of model parameters. For purposes of vectorization
-                    this can be a 2D array, where the first dimension cycles over
-                    different sets of parameters.
+        Parameters
+        ----------
+        params : np.ndarray(Nmodels, Nparams) or np.ndarray(Nparams)
+            An array of model parameters. For purposes of vectorization
+            this can be a 2D array, where the first dimension cycles over
+            different sets of parameters.
+        stepwise : bool
+            If true, this function returns the spectral model as a function
+            of stellar age.
 
-                stepwise : bool
-                    If true, this function returns the spectral model as a function
-                    of stellar age.
+        Returns
+        -------
+        lnu_processed : np.ndarray(Nmodels, Nwave) or np.ndarray(Nmodels, Nwave, Nages)
+            Model including the effects of ISM dust, convolved with the filters.
+        lnu_intrinsic : np.ndarray(Nmodels, Nwave) or np.ndarray(Nmodels, Nwave, Nages)
+            Model not including the effects of ISM dust, convolved with the filters.
 
-            Returns
-            -------
-                lnu_processed : np.ndarray(Nmodels, Nwave) or np.ndarray(Nmodels, Nwave, Nages)
-                    Model including the effects of ISM dust, convolved with the filters.
-
-                lnu_intrinsic : np.ndarray(Nmodels, Nwave) or np.ndarray(Nmodels, Nwave, Nages)
-                    Model not including the effects of ISM dust, convolved with the filters.
         '''
 
         #sfh_shape = sfh.shape # expecting ndarray(Nmodels, Nsteps)
@@ -551,11 +594,25 @@ class Lightning:
 
 
     def get_model_likelihood(self, params, negative=True):
-        '''
-            Log-likelihood of the model under the given parameters.
+        '''Calculate the log-likelihood of the model under the given parameters.
 
-            If `negative` flag is set (on by default), returns the negative log likelihood
-            (i.e. chi2 / 2).
+        If ``negative`` flag is set (on by default), returns the negative log likelihood
+        (i.e. chi2 / 2).
+
+        Parameters
+        ----------
+        params : np.ndarray(Nmodels, Nparams)
+            An array of the parameters expected by the model. See ``Lightning.print_params()`` for
+            details on the current model parameters.
+        negative : bool
+            A flag setting whether the log probability or its opposite is returned (as e.g. when using
+            a minimization method). (Default: ``True``)
+
+        Returns
+        -------
+        log_like : np.ndarray(Nmodels,)
+            The log of the likelihood.
+
         '''
 
         if ((self.Lnu_obs is None) or (self.Lnu_unc is None)):
@@ -572,31 +629,29 @@ class Lightning:
 
 
     def get_model_log_prob(self, params, priors=None, negative=True, p_bound=np.inf):
-        '''
-            Log-probability (eventaully, including prior probability) of the model under the
-            given parameters.
+        '''Calculate the log-probability of the model under the given parameters.
 
-            If `negative` flag is set (on by default), returns the negative log probability
-            (i.e. chi2 / 2 + log(prior)).
+        If ``negative`` flag is set (on by default), returns the negative log probability
+        (i.e. chi2 / 2 + log(prior)).
 
-            Inputs
-            ------
-                params : np.ndarray(Nmodels, Nparams)
-                    An array of the parameters expected by the model. See ``Lightning.print_params()`` for
-                    details on the current model parameters.
-                priors : list of Nparams callables
-                    Priors on the parameters.
-                negative : bool
-                    A flag setting whether the log probability or its opposite is returned (as e.g. when using
-                    a minimization method). (Default: ``True``)
-                p_bound : float
-                    The magnitude of the log probability for models outside of the parameter space.
-                    (Default: ``np.inf``)
+        Parameters
+        ----------
+        params : np.ndarray(Nmodels, Nparams)
+            An array of the parameters expected by the model. See ``Lightning.print_params()`` for
+            details on the current model parameters.
+        priors : list of Nparams callables
+            Priors on the parameters.
+        negative : bool
+            A flag setting whether the log probability or its opposite is returned (as e.g. when using
+            a minimization method). (Default: ``True``)
+        p_bound : float
+            The magnitude of the log probability for models outside of the parameter space.
+            (Default: ``np.inf``)
 
-            Returns
-            -------
-                log_prob : np.ndarray(Nmodels,)
-                    The log of the probability, prior * likelihood.
+        Returns
+        -------
+        log_prob : np.ndarray(Nmodels,)
+            The log of the probability, prior * likelihood.
 
         '''
 
@@ -638,7 +693,7 @@ class Lightning:
         #
 
         #ob_mask = ob_mask | (np.any(params < par_bounds[:,0][None,:], axis=1) | np.any(params > par_bounds[:,1][None,:], axis=1))
-        ob_mask = self.check_bounds(params)
+        ob_mask = self._check_bounds(params)
         ib_mask = np.logical_not(ob_mask)
 
         #log_prob = np.zeros(Nmodels)
@@ -678,15 +733,15 @@ class Lightning:
 
             return log_prob
 
-    def check_bounds(self, params):
+    def _check_bounds(self, params):
         '''
-            Look at the parameters and make sure that none of
-            them are out of bounds. As of right now, that doesn't
-            mean outside of the prior range, that means outside the
-            range where the model is defined or meaningful.
+        Look at the parameters and make sure that none of
+        them are out of bounds. As of right now, that doesn't
+        mean outside of the prior range, that means outside the
+        range where the model is defined or meaningful.
 
-            This is gonna be kinda slow, I think. With more careful handling
-            of the parameters it could be improved.
+        This is gonna be kinda slow, I think. With more careful handling
+        of the parameters it could be improved.
         '''
 
         param_shape = params.shape
@@ -727,7 +782,7 @@ class Lightning:
         for i in np.arange(len(self.model_components)):
             mod = self.model_components[i]
             if mod is not None:
-                ob_mask[:,i] = np.any(mod.check_bounds(p[i]), axis=1)
+                ob_mask[:,i] = np.any(mod._check_bounds(p[i]), axis=1)
 
         #print(ob_mask)
 
@@ -735,6 +790,9 @@ class Lightning:
 
 
     def _fit_emcee(self, p0, **kwargs):
+        '''
+        Helper function to fit with emcee
+        '''
 
         import emcee
 
@@ -795,6 +853,9 @@ class Lightning:
 
 
     def _fit_simplex(self, p0, **kwargs):
+        '''
+        Helper function to fit with a minimizer.
+        '''
 
         from scipy.optimize import minimize
 
@@ -832,6 +893,22 @@ class Lightning:
 
 
     def fit(self, p0, **kwargs):
+        '''Fit the model to the data.
+
+        Parameters
+        ----------
+        p0 : np.ndarray, (Nwalkers, Nparam), float32
+            Initial parameters. In the case of the affine invariant MCMC
+            sampler, this should be a 2D array initializing the entire ensemble.
+        method : {'emcee', 'simplex'}
+            Fitting method.
+
+        Returns
+        -------
+        emcee ensemble sampler object or scipy.opt.minimize result, depending on
+        ``method``.
+
+        '''
 
         if ((self.Lnu_obs is None) or (self.Lnu_unc is None)):
             raise AttributeError('In order to fit model, observed flux and uncertainty must be set.')

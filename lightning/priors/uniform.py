@@ -2,8 +2,10 @@ import numpy as np
 from .base import AnalyticPrior
 
 class UniformPrior(AnalyticPrior):
-    '''
-        Uniform prior.
+    '''Uniform prior.
+
+    ``p = 1 / (b - a) if x is in [a, b), 0 otherwise``
+    
     '''
 
     type = 'analytic'
@@ -28,6 +30,11 @@ class UniformPrior(AnalyticPrior):
         self.params = params
 
     def evaluate(self, x):
+        '''
+        Return an array with the same shape as x that's equal to ``1 / (b - a)``
+        wherever x is in [a,b) and 0 elsewhere.
+        '''
+
         b = self.params[1]
         a = self.params[0]
 
