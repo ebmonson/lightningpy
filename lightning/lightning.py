@@ -10,6 +10,7 @@
 # Standard library
 import time
 import warnings
+import numbers
 # Scipy/numpy
 import numpy as np
 from scipy.integrate import trapz
@@ -73,6 +74,12 @@ class Lightning:
         Path to lightning filters. Not actually used.
     print_setup_time : bool
         If ``True``, the setup time will be printed.
+    model_unc : np.ndarray, (Nfilters,), float32, or float
+        Fractional (i.e. [0,1)) model uncertainty to include in the fits. If
+        a scalar is provided, the same model uncertainty is applied to each filter.
+        Alternately, model uncertainties can be provided as an array, one per filter.
+        The smarter way to do this in the future may be to set model uncertainties per
+        component, rather than per filter.
     cosmology : astropy.cosmology.FlatLambdaCDM
         The cosmology to assume.
 
@@ -104,6 +111,7 @@ class Lightning:
     path_to_filters : str
         The path (relative or absolute, should just make it absolute) to the
         top filter directory.
+    model_unc
 
     '''
 
@@ -116,6 +124,7 @@ class Lightning:
                  dust_emission=False,
                  lightning_filter_path=None,
                  print_setup_time=False,
+                 model_unc=None,
                  cosmology=None):
 
         self.filter_labels = filter_labels
@@ -165,6 +174,22 @@ class Lightning:
             self.Lnu_unc = None
         else:
             self.flux_unc = flux_obs_unc
+
+        # Model uncertainty - either a scalar or an array
+        # with one entry per filter.
+        if (model_unc is None):
+            self.model_unc = np.zeros(len(filter_labels))
+        else:
+            # Scalar case
+            if isinstance(model_unc, numbers.Number):
+                assert (model_unc < 1), "'model_unc' should be a number less than 1."
+                self.model_unc = np.full(len(filter_labels), model_unc)
+            # If it's not a scalar, assume it's a vector
+            else:
+                model_unc = np.array(model_unc).flatten()
+                assert (np.all(model_unc < 1)), "All elements of 'model_unc' should be numbers less than 1."
+                assert (len(model_unc) == len(self.filter_labels)), "Length of 'model_unc' (%d) must match length of 'filter_labels' (%d)" % (len(model_unc), len(self.filter_labels))
+                self.model_unc = model_unc
 
         # Initialize wavelength grid
         # Some error handling here would be nice
@@ -620,7 +645,10 @@ class Lightning:
 
         lnu_model, _ = self.get_model_lnu(params, stepwise=False) # ndarray(Nmodels, Nfilters)
 
-        chi2 = np.nansum(((lnu_model - self.Lnu_obs[None,:]) / self.Lnu_unc[None,:])**2, axis=-1)
+        # Add in the model contribution to the uncertainty in quadrature.
+        total_unc2 = self.Lnu_unc[None,:]**2 + (lnu_model * self.model_unc[None,:])**2
+
+        chi2 = np.nansum((lnu_model - self.Lnu_obs[None,:])**2 / total_unc2, axis=-1)
 
         if(negative):
             return 0.5 * chi2
