@@ -27,6 +27,7 @@ from .sfh import PiecewiseConstSFH
 from .sfh.delayed_exponential import DelayedExponentialSFH
 from .stellar import StellarModel
 from .dust import DustModel
+from .agn import AGNModel
 from .attenuation.calzetti import CalzettiAtten, ModifiedCalzettiAtten
 from .get_filters import get_filters
 
@@ -70,6 +71,9 @@ class Lightning:
     dust_emission : bool
         If ``True``, a Draine & Li (2007) dust emission model is included,
         in energy balance with the attenuated power.
+    agn_emission : bool
+        If ``True``, a Stalevski et al. (2016) UV-IR AGN emission model is
+        included.
     lightning_filter_path : str
         Path to lightning filters. Not actually used.
     print_setup_time : bool
@@ -122,6 +126,7 @@ class Lightning:
                  SFH_type='Piecewise-Constant', ages=None,
                  atten_type='Modified-Calzetti',
                  dust_emission=False,
+                 agn_emission=False,
                  lightning_filter_path=None,
                  print_setup_time=False,
                  model_unc=None,
@@ -285,9 +290,17 @@ class Lightning:
 
         t5 = time.time()
 
+        # Set up AGN emission
+        if(agn_emission):
+            self._setup_agn()
+        else:
+            self.agn = None
+
+        t6 = time.time()
+
         # For later use, make an array of the model components and
         # figure out how many components our total model has
-        self.model_components = [self.sfh, self.atten, self.dust]
+        self.model_components = [self.sfh, self.atten, self.dust, self.agn]
         self.Nparams = 0
         for mod in self.model_components:
             if (mod is not None):
@@ -299,7 +312,8 @@ class Lightning:
             print('%.3f s elapsed in stellar model setup' % (t3 - t2))
             print('%.3f s elapsed in dust attenuation model setup' % (t4 - t3))
             print('%.3f s elapsed in dust emission model setup' % (t5 - t4))
-            print('%.3f s elapsed total' % (t5 - t0))
+            print('%.3f s elapsed in agn emission model setup' % (t6 - t5))
+            print('%.3f s elapsed total' % (t6 - t0))
 
 
     @property
@@ -426,6 +440,13 @@ class Lightning:
 
         self.dust = DustModel(self.filter_labels, self.redshift)
 
+    def _setup_agn(self):
+        '''
+        Initialize AGN emission model.
+        '''
+
+        self.agn = AGNModel(self.filter_labels, self.redshift, wave_grid=self.wave_grid_rest)
+
     def print_params(self, verbose=False):
         '''Print all the parameters of the current model.
 
@@ -508,6 +529,9 @@ class Lightning:
             i += self.atten.Nparams
         if (self.dust is not None):
             dust_params = params[:,i:i + self.dust.Nparams]
+            i += self.dust.Nparams
+        if (self.agn is not None):
+            agn_params = params[:,i:i + self.agn.Nparams]
 
         # exptau = modified_calzetti(self.wave_grid_rest, params[:,0], params[:,1], np.zeros(Nmodels)) # ndarray(Nmodels, len(self.wave_grid_rest))
         # exptau_youngest = modified_calzetti(self.wave_grid_rest, params[:,0], params[:,1], params[:,2])
@@ -534,6 +558,10 @@ class Lightning:
             lnu_dust_interp = finterp_dust(self.wave_grid_obs)
             lnu_processed = lnu_processed + L_TIR_stellar[:,None] * lnu_dust_interp / Lbol_dust[:,None]
 
+        if (self.agn is not None):
+            lnu_agn = self.agn.get_model_lnu_hires(agn_params, exptau=expminustau)
+            lnu_processed = lnu_processed + lnu_agn
+
         # if stepwise:
         #     if (Nmodels == 1):
         #         steps_lnu_unattenuated = steps_lnu_unattenuated.reshape(Nsteps,-1)
@@ -556,6 +584,93 @@ class Lightning:
             lnu_intrinsic = lnu_intrinsic.flatten()
 
         return lnu_processed, lnu_intrinsic
+
+    def get_model_components_lnu_hires(self, params, stepwise=False):
+        '''Construct the individual components of the high-resolution spectral model.
+
+        This function returns a dictionary (or an array, I haven't decided yet)
+        containing the indiviudal model components interpolated to the same wavelength
+        grid.
+
+        Parameters
+        ----------
+        params : np.ndarray(Nmodels, Nparams) or np.ndarray(Nparams)
+            An array of model parameters. For purposes of vectorization
+            this can be a 2D array, where the first dimension cycles over
+            different sets of parameters.
+        stepwise : bool
+            If true, this function returns the spectral model as a function
+            of stellar age.
+
+        Returns
+        -------
+        hires_models : dict
+            Keys are {'stellar_attenuated', 'stellar_unattenuated', 'attenuation', 'dust', 'agn'}
+            where 'dust' and 'agn' are only included if the model includes these components. Each key
+            points to a numpy array containing the high-resolution models.
+
+        '''
+
+        #sfh_shape = sfh.shape # expecting ndarray(Nmodels, Nsteps)
+        param_shape = params.shape # expecting ndarray(Nmodels, Nparams)
+
+        if (len(param_shape) == 1):
+            params = params.reshape(1, params.size)
+            param_shape = params.shape
+
+        Nmodels = param_shape[0]
+        Nparams = param_shape[1]
+
+        assert (Nparams == self.Nparams), 'Number of provided parameters (%d) must match the total number of parameters expected by the model (%d). Check Lightning.print_params().' % (Nparams, self.Nparams)
+
+        # Chunk up parameter array -- eventually this ought to be a dict or something
+        sfh_params = params[:, 0:self.sfh.Nparams]
+        i = self.sfh.Nparams
+        if (self.atten is not None):
+            atten_params = params[:,i:i + self.atten.Nparams]
+            i += self.atten.Nparams
+        if (self.dust is not None):
+            dust_params = params[:,i:i + self.dust.Nparams]
+            i += self.dust.Nparams
+        if (self.agn is not None):
+            agn_params = params[:,i:i + self.agn.Nparams]
+
+        # exptau = modified_calzetti(self.wave_grid_rest, params[:,0], params[:,1], np.zeros(Nmodels)) # ndarray(Nmodels, len(self.wave_grid_rest))
+        # exptau_youngest = modified_calzetti(self.wave_grid_rest, params[:,0], params[:,1], params[:,2])
+
+        expminustau = self.atten.evaluate(atten_params)
+
+        if (Nmodels == 1):
+            expminustau = expminustau.reshape(1,-1)
+            #exptau_youngest = exptau.reshape(1,-1)
+
+        hires_models = dict()
+
+        lnu_stellar_attenuated, lnu_stellar_unattenuated, L_TIR_stellar = self.stars.get_model_lnu_hires(self.sfh,
+                                                                                                         sfh_params,
+                                                                                                         exptau=expminustau,
+                                                                                                         stepwise=False)
+
+        hires_models['stellar_attenuated'] = lnu_stellar_attenuated
+        hires_models['stellar_unattenuated'] = lnu_stellar_unattenuated
+        hires_models['attenuation'] = expminustau
+
+        if (self.dust is not None):
+            lnu_dust_native, Lbol_dust = self.dust.get_model_lnu_hires(dust_params)
+            # Dust model comes out at native resolution; we interpolate it to whatever our resolution is here.
+            finterp_dust = interp1d(self.dust.wave_grid_obs, lnu_dust_native, bounds_error=False, fill_value=0)
+            lnu_dust_interp = finterp_dust(self.wave_grid_obs)
+            lnu_dust = L_TIR_stellar[:,None] * lnu_dust_interp / Lbol_dust[:,None]
+            hires_models['dust'] = lnu_dust
+
+        if (self.agn is not None):
+            lnu_agn = self.agn.get_model_lnu_hires(agn_params, exptau=expminustau)
+            hires_models['agn'] = lnu_agn
+
+        if (Nmodels == 1):
+            for key in hires_models: hires_models[key] = hires_models[key].flatten()
+
+        return hires_models
 
 
     def get_model_lnu(self, params, stepwise=False):
@@ -796,10 +911,16 @@ class Lightning:
 
         if (self.dust is not None):
             dust_params = params[:,i:i + self.dust.Nparams]
+            i += self.dust.Nparams
         else:
             dust_params = None
 
-        p = [sfh_params, atten_params, dust_params]
+        if (self.agn is not None):
+            agn_params = params[:,i:i + self.agn.Nparams]
+        else:
+            agn_params = None
+
+        p = [sfh_params, atten_params, dust_params, agn_params]
 
         # print(sfh_params)
         # print(atten_params)
