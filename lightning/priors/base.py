@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.integrate import cumtrapz
 from scipy.interpolate import interp1d
 
 class AnalyticPrior():
@@ -31,7 +32,17 @@ class AnalyticPrior():
 
     def evaluate(self, x):
         '''
-        This function must be overwritten by each specific prior.
+        This function must be overwritten by each specific prior,
+        implementing the PDF.
+        '''
+
+        return np.zeros_like(x)
+
+    def quantile(self, q):
+        '''
+        This function must be overwritten by each specific prior,
+        implementing the quantile function/PPF (the inverse of the
+        CDF).
         '''
 
         return np.zeros_like(x)
@@ -54,13 +65,24 @@ class TabulatedPrior():
         assert (len(x) == len(y)), "Number of probability values (%d) must match number of independent variable values (%d)." % (len(y), len(x))
 
         self.callable = interp1d(x, y, **kwargs)
+        cdf = cumtrapz(y, x, initial=0)
+        self.inverse = interp1d(cdf, x, **kwargs)
 
     def evaluate(self, x):
         '''
-            Evaluate the scipy.interpolate.interp1d object on ``x``.
+        Evaluate the scipy.interpolate.interp1d object representing the PDF
+        on ``x``.
         '''
 
         return self.callable(x)
+
+    def quantile(self, q):
+        '''
+        Evaluate the scipy.interpolate.interp1d object representing the
+        quantile function on ``q``.
+        '''
+
+        return self.inverse(q)
 
     def __call__(self, x):
 

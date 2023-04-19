@@ -5,7 +5,7 @@ class UniformPrior(AnalyticPrior):
     '''Uniform prior.
 
     ``p = 1 / (b - a) if x is in [a, b), 0 otherwise``
-    
+
     '''
 
     type = 'analytic'
@@ -42,3 +42,13 @@ class UniformPrior(AnalyticPrior):
         p[(x >= a) & (x < b)] = 1 / (b - a)
 
         return p
+
+    def quantile(self, q):
+        '''
+        Return an array with the same shape as q that's equal to ``q * (b - a) + a``.
+        '''
+
+        b = self.params[1]
+        a = self.params[0]
+
+        x = q * (b - a) + a
