@@ -52,3 +52,5 @@ class UniformPrior(AnalyticPrior):
         a = self.params[0]
 
         x = q * (b - a) + a
+
+        return x

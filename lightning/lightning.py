@@ -3,7 +3,6 @@
 '''An object-oriented interface for Lightning.
 
     TODO:
-    - Add optical-IR AGN model
     - Whole X-ray thing
 '''
 
@@ -1000,6 +999,91 @@ class Lightning:
 
         return sampler
 
+    def _fit_ultranest(self, **kwargs):
+        '''
+        Helper function to fit with ultranest
+        '''
+
+        import ultranest
+        import ultranest.stepsampler
+        import ultranest.mlfriends
+
+        Ndim = self.Nparams
+        param_names = kwargs['param_names']
+
+        try:
+            const_dim = kwargs['const_dim']
+            const_dim = np.array(const_dim)
+            var_dim = np.logical_not(const_dim)
+            N_const_dim = np.count_nonzero(const_dim)
+            N_var_dim = Ndim - N_const_dim
+            const_vals = kwargs['const_vals']
+            assert(len(const_vals) == N_const_dim), 'Number of values for constant parameters (%d) is inconsistent with the number of constant dimensions (%d).' % (len(const_vals), N_const_dim)
+        except:
+            const_dim = np.zeros(Ndim, dtype='bool')
+            var_dim = np.logical_not(const_dim)
+            N_const_dim = 0
+            N_var_dim = Ndim
+
+        priors = kwargs['priors']
+
+        assert(len(priors) == Ndim), 'Length of prior array (%d) is inconsistent with the number of parameters in the model (%d).' % (len(priors), Ndim)
+        for i,pr in enumerate(priors):
+            if var_dim[i]: assert(pr is not None), 'Nested sampling requires priors for all sampled parameters.'
+
+        priors = np.array(priors)
+        var_priors = priors[var_dim]
+
+        def prior_transform(cube):
+            '''
+            Transform from the unit cube to parameter space.
+            '''
+
+            params = np.zeros_like(cube)
+
+            for i, pr in enumerate(var_priors):
+
+                params[:,i] = pr.quantile(cube[:,i])
+
+            return params
+
+        def likelihood_func(params):
+            '''
+            Calculate the likelihood.
+            '''
+
+            if (N_const_dim > 0):
+                params_shape = params.shape
+                xx = np.zeros((params_shape[0], Ndim))
+                xx[:, const_dim] = const_vals
+                xx[:, var_dim] = params
+            else:
+                xx = params
+
+            like = self.get_model_likelihood(xx, negative=False)
+
+            return like
+
+        sampler = ultranest.ReactiveNestedSampler(param_names,
+                                                  likelihood_func,
+                                                  prior_transform,
+                                                  num_test_samples=10,
+                                                  vectorized=True)
+
+        nsteps = 2 * len(param_names)
+        sampler.stepsampler = ultranest.stepsampler.SliceSampler(
+                                  nsteps=nsteps,
+                                  generate_direction=ultranest.stepsampler.generate_mixture_random_direction,
+                                  # adaptive_nsteps=False,
+                                  # max_nsteps=400
+                                  )
+
+        result = sampler.run(region_class=ultranest.mlfriends.RobustEllipsoidRegion)
+
+        out = {'result': result,
+               'sampler': sampler}
+
+        return out
 
     def _fit_simplex(self, p0, **kwargs):
         '''
@@ -1041,15 +1125,15 @@ class Lightning:
         return res
 
 
-    def fit(self, p0, **kwargs):
+    def fit(self, p0=None, **kwargs):
         '''Fit the model to the data.
 
         Parameters
         ----------
-        p0 : np.ndarray, (Nwalkers, Nparam), float32
+        p0 : np.ndarray, (Nwalkers, Nparam), float32, optional
             Initial parameters. In the case of the affine invariant MCMC
             sampler, this should be a 2D array initializing the entire ensemble.
-        method : {'emcee', 'simplex'}
+        method : {'emcee', 'ultranest', 'simplex'}
             Fitting method.
 
         Returns
@@ -1066,6 +1150,8 @@ class Lightning:
 
         if(method == 'emcee'):
             res = self._fit_emcee(p0, **kwargs)
+        elif(method == 'ultranest'):
+            res = self._fit_ultranest(**kwargs)
         elif(method == 'simplex'):
             res = self._fit_simplex(p0, **kwargs)
         else:
