@@ -4,6 +4,7 @@
 
     TODO:
     - Whole X-ray thing
+    - Tune Ultranest integration
 '''
 
 # Standard library
@@ -1078,12 +1079,10 @@ class Lightning:
                                   # max_nsteps=400
                                   )
 
-        result = sampler.run(region_class=ultranest.mlfriends.RobustEllipsoidRegion)
+        result = sampler.run(region_class=ultranest.mlfriends.RobustEllipsoidRegion,
+                             frac_remain=0.1)
 
-        out = {'result': result,
-               'sampler': sampler}
-
-        return out
+        return sampler
 
     def _fit_simplex(self, p0, **kwargs):
         '''
