@@ -31,6 +31,7 @@ from .stellar import StellarModel
 from .dust import DustModel # Move inside setup function where needed?
 from .agn import AGNModel # Move inside setup function where needed?
 from .xray import StellarPlaw, AGNPlaw
+from .xray.absorption import Tbabs, Phabs
 from .attenuation.calzetti import CalzettiAtten, ModifiedCalzettiAtten
 from .get_filters import get_filters
 
@@ -135,8 +136,10 @@ class Lightning:
                  xray_agn_emission=None,
                  xray_absorption=None,
                  xray_wave_grid=(1e-6, 1e-1, 200),
+                 xray_counts=None,
                  xray_arf=None,
                  xray_exposure=None,
+                 galactic_NH=0.0,
                  lightning_filter_path=None,
                  print_setup_time=False,
                  model_unc=None,
@@ -176,6 +179,10 @@ class Lightning:
 
         self.DL = DL
 
+        if (xray_mode not in ['flux', 'counts', 'None', None]):
+            raise ValueError('X-ray mode "%s" not understood.' % (xray_mode))
+        self.xray_mode = xray_mode
+
         # Handle fluxes if they're provided at this stage
         if (flux_obs is None):
             self._flux_obs = None
@@ -213,7 +220,7 @@ class Lightning:
             self.wave_grid_rest = wave_grid
 
         # If the X-ray model is required, define the X-ray wave grid
-        if(xray_mode not in [None, 'None']):
+        if(self.xray_mode not in [None, 'None']):
             assert (xray_wave_grid is not None), 'Wavelengths for X-ray model must be provided.'
             if isinstance(xray_wave_grid, tuple):
                 self.xray_wave_grid_rest = np.logspace(np.log10(xray_wave_grid[0]), np.log10(xray_wave_grid[1]), xray_wave_grid[2])
@@ -225,12 +232,11 @@ class Lightning:
             self.xray_nu_grid_rest = const.c.to(u.um / u.s).value / self.xray_wave_grid_rest
             self.xray_nu_grid_obs = const.c.to(u.um / u.s).value / self.xray_wave_grid_obs
 
-            self.xray_mode = xray_mode
+            #self.xray_mode = xray_mode
 
             #self.wave_grid_rest = np.concatenate((self.wave_grid_rest, self.xray_wave_grid_rest))
 
         self.wave_grid_obs = (1 + self.redshift) * self.wave_grid_rest
-
         self.nu_grid_rest = const.c.to(u.um / u.s).value / self.wave_grid_rest
         self.nu_grid_obs = const.c.to(u.um / u.s).value / self.wave_grid_obs
 
@@ -350,7 +356,7 @@ class Lightning:
         #allowed_xray_em = ['Xray-Plaw', 'Xray-Plaw-Expcut', 'None', None]
         allowed_xray_st_em = ['Stellar-Plaw', 'None', None]
         allowed_xray_agn_em = ['AGN-Plaw', 'None', None]
-        allowed_xray_abs = ['None', None]
+        allowed_xray_abs = ['tbabs', 'phabs', 'None', None]
         if xray_stellar_emission not in allowed_xray_st_em:
             print('Allowed X-ray stellar emission models are:', allowed_xray_at_em)
             raise ValueError("X-ray stellar emission type '%s' not understood." % (xray_stellar_emission))
@@ -367,28 +373,28 @@ class Lightning:
         else:
             self.xray_abs_type = xray_absorption
 
-        self.xray_abs = None
-
+        if(self.xray_abs_type not in ['None', None]):
+            self._setup_xray_absorption()
+        else:
+            self.xray_abs_intr = None
+            self.xray_abs_gal = None
         if(self.xray_st_em_type not in ['None', None]):
-            self._setup_xray_stellar(xray_wave_grid, xray_arf, xray_exposure)
+            self._setup_xray_stellar(xray_arf, xray_exposure)
         else:
             self.xray_stellar_em = None
         if(self.xray_agn_em_type not in ['None', None]):
-            self._setup_xray_agn(xray_wave_grid, xray_arf, xray_exposure)
+            self._setup_xray_agn(xray_arf, xray_exposure)
         else:
             self.xray_agn_em = None
 
-        # if (isinstance(xray_wave_grid, tuple)):
-        #     self._Nwave_xray = xray_wave_grid[-1]
-        # else:
-        #     self._Nwave_xray = len(xray_wave_grid)
+        self.galactic_NH = galactic_NH
 
         t7 = time.time()
 
         # For later use, make an array of the model components and
         # figure out how many components our total model has
         self.model_components = [self.sfh, self.atten, self.dust, self.agn,
-                                 self.xray_stellar_em, self.xray_agn_em, self.xray_abs]
+                                 self.xray_stellar_em, self.xray_agn_em, self.xray_abs_intr]
         self.Nparams = 0
         for mod in self.model_components:
             if (mod is not None):
@@ -536,7 +542,21 @@ class Lightning:
 
         self.agn = AGNModel(self.filter_labels, self.redshift, wave_grid=self.wave_grid_rest)
 
-    def _setup_xray_stellar(self, xray_wave_grid, xray_arf, xray_exposure):
+    def _setup_xray_absorption(self):
+        '''
+        Initialize X-ray absorption model.
+        '''
+
+        if (self.xray_abs_type == 'tbabs'):
+            self.xray_abs_intr = Tbabs(wave=self.xray_wave_grid_rest)
+            self.xray_abs_gal = Tbabs(wave=self.xray_wave_grid_obs)
+        elif (self.xray_abs_type == 'phabs'):
+            self.xray_abs_intr = Phabs(wave=self.xray_wave_grid_rest)
+            self.xray_abs_gal = Phabs(wave=self.xray_wave_grid_obs)
+        else:
+            raise ValueError("X-ray absorption type (%s) not understood." % (self.xray_abs_type))
+
+    def _setup_xray_stellar(self, xray_arf, xray_exposure):
         '''
         Initialize stellar X-ray emission model.
         '''
@@ -558,7 +578,7 @@ class Lightning:
 
         # self.xray_abs = None
 
-    def _setup_xray_agn(self, xray_wave_grid, xray_arf, xray_exposure):
+    def _setup_xray_agn(self, xray_arf, xray_exposure):
         '''
         Initialize AGN X-ray emission model.
         '''
@@ -571,7 +591,7 @@ class Lightning:
             raise NotImplementedError('QSOSED model not implemented yet.')
             self.xray_agn_em = None # ...
         else:
-            raise ValueError("X-ray emission type (%s) not understood." % (self.xray_em_type))
+            raise ValueError("X-ray emission type (%s) not understood." % (self.xray_agn_em_type))
 
     def print_params(self, verbose=False):
         '''Print all the parameters of the current model.
@@ -769,7 +789,7 @@ class Lightning:
         -------
         lnu_absorbed: np.ndarray(Nmodels, Nwave) or np.ndarray(Nmodels, Nwave, Nages)
             High resolution spectral model including the effects of the chosen absorption model.
-        lnu_intrinsic : np.ndarray(Nmodels, Nwave) or np.ndarray(Nmodels, Nwave, Nages)
+        lnu_unabsorbed : np.ndarray(Nmodels, Nwave) or np.ndarray(Nmodels, Nwave, Nages)
             High resolution spectral model not including the effects of the chosen absorption model.
 
         '''
@@ -803,28 +823,63 @@ class Lightning:
         if (self.xray_agn_em is not None):
             agn_xray_params = params[:,i:i + self.xray_agn_em.Nparams]
             i += self.xray_agn_em.Nparams
+        if (self.xray_abs_intr is not None):
+            xray_abs_params = params[:,i:i + self.xray_abs_intr.Nparams]
+            i += self.xray_abs_intr.Nparams
 
-        lnu_xray_intr = np.zeros((Nmodels, len(self.xray_wave_grid_rest)))
-        #lnu_xray_abs = np.zeros((Nmodels, len(self.xray_wave_grid_rest)))
+        # lnu_xray_intr = np.zeros((Nmodels, len(self.xray_wave_grid_rest)))
+        # #lnu_xray_abs = np.zeros((Nmodels, len(self.xray_wave_grid_rest)))
+
+        lnu_xray_unabs = np.zeros((Nmodels, len(self.xray_wave_grid_rest)))
+        lnu_xray_abs = np.zeros((Nmodels, len(self.xray_wave_grid_rest)))
+
+        if (self.xray_abs_type not in ['None', None]):
+            expminustau_gal = self.xray_abs_gal.evaluate(self.galactic_NH)
+            NH_stellar = 22.4 * self.atten.get_AV(atten_params)
+            if ((self.xray_stellar_em is not None) and (self.xray_agn_em is not None)):
+                expminustau_agn = self.xray_abs_intr.evaluate(xray_abs_params)
+                expminustau_stellar = self.xray_abs_intr.evaluate(NH_stellar)
+            elif (self.xray_stellar_em is not None):
+                expminustau_agn = np.ones_like((Nmodels, self.xray_wave_grid_rest))
+                expminustau_stellar = self.xray_abs_intr.evaluate(xray_abs_params)
+            elif (self.xray_agn_em is not None):
+                expminustau_agn = self.xray_abs_intr.evaluate(xray_abs_params)
+                expminustau_stellar = np.ones_like((Nmodels, self.xray_wave_grid_rest))
+        else:
+            expminustau_gal = np.ones_like(self.xray_wave_grid_rest)
+            expminustau_stellar = np.ones_like((Nmodels, self.xray_wave_grid_rest))
+            expminustau_agn = np.ones_like((Nmodels, self.xray_wave_grid_rest))
+
+        if (Nmodels == 1):
+            expminustau_stellar = expminustau_stellar.reshape(1,-1)
+            expminustau_agn = expminustau_agn.reshape(1,-1)
 
         if (self.xray_stellar_em is not None):
-            lnu_xray_intr += self.xray_stellar_em.get_model_lnu_hires(st_xray_params,
-                                                                      self.stars,
-                                                                      self.sfh, sfh_params)
+            lnu_abs_tmp, lnu_unabs_tmp = self.xray_stellar_em.get_model_lnu_hires(st_xray_params,
+                                                                                  self.stars,
+                                                                                  self.sfh, sfh_params,
+                                                                                  exptau=(expminustau_gal[None,:] * expminustau_stellar))
+
+            lnu_xray_unabs += lnu_unabs_tmp
+            lnu_xray_abs += lnu_abs_tmp
 
         if (self.xray_agn_em is not None):
-            lnu_xray_intr += self.xray_agn_em.get_model_lnu_hires(agn_xray_params,
-                                                                  self.agn,
-                                                                  agn_params)
+            lnu_abs_tmp, lnu_unabs_tmp = self.xray_agn_em.get_model_lnu_hires(agn_xray_params,
+                                                                              self.agn,
+                                                                              agn_params,
+                                                                              exptau=(expminustau_gal[None,:] * expminustau_agn))
+
+            lnu_xray_unabs += lnu_unabs_tmp
+            lnu_xray_abs += lnu_abs_tmp
 
         # Absorption not in yet
-        lnu_xray_abs = lnu_xray_intr
+        #lnu_xray_abs = lnu_xray_intr
 
         if (Nmodels == 1):
             lnu_xray_abs = lnu_xray_abs.flatten()
-            lnu_xray_intr = lnu_xray_intr.flatten()
+            lnu_xray_unabs = lnu_xray_unabs.flatten()
 
-        return lnu_xray_abs, lnu_xray_intr
+        return lnu_xray_abs, lnu_xray_unabs
 
 
     def get_model_components_lnu_hires(self, params, stepwise=False):
@@ -989,9 +1044,9 @@ class Lightning:
 
         Returns
         -------
-        lnu_processed : np.ndarray(Nmodels, Nwave) or np.ndarray(Nmodels, Nwave, Nages)
+        lnu_absorbed : np.ndarray(Nmodels, Nwave) or np.ndarray(Nmodels, Nwave, Nages)
             Model including the effects of the chosen absorption model, convolved with the filters.
-        lnu_intrinsic : np.ndarray(Nmodels, Nwave) or np.ndarray(Nmodels, Nwave, Nages)
+        lnu_unabsorbed : np.ndarray(Nmodels, Nwave) or np.ndarray(Nmodels, Nwave, Nages)
             Model not including the effects of the chosen absorption model, convolved with the filters.
 
         '''
@@ -1033,28 +1088,55 @@ class Lightning:
         if (self.xray_agn_em is not None):
             agn_xray_params = params[:,i:i + self.xray_agn_em.Nparams]
             i += self.xray_agn_em.Nparams
+        if (self.xray_abs_intr is not None):
+            xray_abs_params = params[:,i:i + self.xray_abs_intr.Nparams]
+            i += self.xray_abs_intr.Nparams
 
-        lnu_xray_intr = np.zeros((Nmodels, len(self.filter_labels)))
-        #lnu_xray_abs = np.zeros((Nmodels, len(self.xray_wave_grid_rest)))
+        lnu_xray_unabs = np.zeros((Nmodels, len(self.filter_labels)))
+        lnu_xray_abs = np.zeros((Nmodels, len(self.filter_labels)))
+
+        if (self.xray_abs_type not in ['None', None]):
+            expminustau_gal = self.xray_abs_gal.evaluate(self.galactic_NH)
+            NH_stellar = 22.4 * self.atten.get_AV(atten_params)
+            if ((self.xray_stellar_em is not None) and (self.xray_agn_em is not None)):
+                expminustau_agn = self.xray_abs_intr.evaluate(xray_abs_params)
+                expminustau_stellar = self.xray_abs_intr.evaluate(NH_stellar)
+            elif (self.xray_stellar_em is not None):
+                expminustau_agn = np.ones_like((Nmodels, self.xray_wave_grid_rest))
+                expminustau_stellar = self.xray_abs_intr.evaluate(xray_abs_params)
+            elif (self.xray_agn_em is not None):
+                expminustau_agn = self.xray_abs_intr.evaluate(xray_abs_params)
+                expminustau_stellar = np.ones_like((Nmodels, self.xray_wave_grid_rest))
+        else:
+            expminustau_gal = np.ones_like(self.xray_wave_grid_rest)
+            expminustau_stellar = np.ones_like((Nmodels, self.xray_wave_grid_rest))
+            expminustau_agn = np.ones_like((Nmodels, self.xray_wave_grid_rest))
+
+        if (Nmodels == 1):
+            expminustau_stellar = expminustau_stellar.reshape(1,-1)
+            expminustau_agn = expminustau_agn.reshape(1,-1)
 
         if (self.xray_stellar_em is not None):
-            lnu_xray_intr += self.xray_stellar_em.get_model_lnu(st_xray_params,
+            lnu_abs_tmp, lnu_unabs_tmp = self.xray_stellar_em.get_model_lnu(st_xray_params,
                                                                 self.stars,
-                                                                self.sfh, sfh_params)
+                                                                self.sfh, sfh_params,
+                                                                exptau=(expminustau_gal[None,:] * expminustau_stellar))
+            lnu_xray_unabs += lnu_unabs_tmp
+            lnu_xray_abs += lnu_abs_tmp
 
         if (self.xray_agn_em is not None):
-            lnu_xray_intr += self.xray_agn_em.get_model_lnu(agn_xray_params,
+            lnu_abs_tmp, lnu_unabs_tmp = self.xray_agn_em.get_model_lnu(agn_xray_params,
                                                             self.agn,
-                                                            agn_params)
-
-        # Absorption not in yet
-        lnu_xray_abs = lnu_xray_intr
+                                                            agn_params,
+                                                            exptau=(expminustau_gal[None,:] * expminustau_agn))
+            lnu_xray_unabs += lnu_unabs_tmp
+            lnu_xray_abs += lnu_abs_tmp
 
         if (Nmodels == 1):
             lnu_xray_abs = lnu_xray_abs.flatten()
-            lnu_xray_intr = lnu_xray_intr.flatten()
+            lnu_xray_unabs = lnu_xray_unabs.flatten()
 
-        return lnu_xray_abs, lnu_xray_intr
+        return lnu_xray_abs, lnu_xray_unabs
 
 
     def get_model_likelihood(self, params, negative=True):
@@ -1273,7 +1355,13 @@ class Lightning:
         else:
             agn_xray_params = None
 
-        p = [sfh_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params]
+        if (self.xray_abs_type not in ['None', None]):
+            xray_abs_params = params[:,i:i + self.xray_abs_gal.Nparams]
+            i += self.xray_abs_gal.Nparams
+        else:
+            xray_abs_params = None
+
+        p = [sfh_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params]
 
         # print(sfh_params)
         # print(atten_params)
