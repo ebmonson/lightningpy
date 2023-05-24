@@ -151,6 +151,8 @@ class AGNModel(BaseEmissionModel):
         self.L2500_rest = L2500_grid
         self.Lbol = trapz(lnu_transp[:,:,::-1], nu_model[::-1], axis=2)
 
+        self.L2500_norm = self.L2500_rest / self.Lbol
+
 
     def _construct_model_grid(self):
         '''

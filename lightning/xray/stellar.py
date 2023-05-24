@@ -71,6 +71,34 @@ class StellarPlaw(XrayPlawExpcut):
     param_bounds = np.array([[-2.0, 9.0]])
 
     def get_model_lnu_hires(self, params, stellar_model, sfh, sfh_params, exptau=None):
+        '''Construct the high-resolution spectrum in Lnu.
+
+        This function takes in the stellar and SFH models in order to use the
+        stellar-age parametrization of Lx / M from Gilbertson et al. (2022).
+
+        Parameters
+        ----------
+        params : np.ndarray(Nmodels, Nparams) or np.ndarray(Nparams)
+            An array of model parameters. For purposes of vectorization
+            this can be a 2D array, where the first dimension cycles over
+            different sets of parameters.
+        stellar_model : lightning.stellar.StellarModel
+            The stellar model.
+        sfh : lightning.sfh.PiecewiseConstSFH or lightning.sfh.FunctionalSFH
+            The star formation history model.
+        sfh_params : np.ndarray(Nmodels, Nparams_sfh) or np.ndarray(Nparams_sfh)
+            The parameters for the SFH.
+        exptau : np.ndarray(Nmodels, Nwave) or np.ndarray(Nwave)
+            The e(-tau) absorption curve.
+
+        Outputs
+        -------
+        lnu_abs : np.ndarray(Nmodels, Nwave) or np.ndarray(Nwave)
+            The absorbed Lnu spectrum.
+        lnu_unabs : np.ndarray(Nmodels, Nwave) or np.ndarray(Nwave)
+            The absorbtion-free Lnu spectrum.
+
+        '''
 
         # param_shape = params.shape # expecting ndarray(Nmodels, Nparams)
         # if (len(param_shape) == 1):
@@ -134,6 +162,37 @@ class StellarPlaw(XrayPlawExpcut):
         return lnu_abs, lnu
 
     def get_model_countrate_hires(self, params, stellar_model, sfh, sfh_params, exptau=None):
+        '''Construct the high-resolution countrate-density spectrum.
+
+        This function takes in the stellar and SFH models in order to use the
+        stellar-age parametrization of Lx / M from Gilbertson et al. (2022).
+
+        Parameters
+        ----------
+        params : np.ndarray(Nmodels, Nparams) or np.ndarray(Nparams)
+            An array of model parameters. For purposes of vectorization
+            this can be a 2D array, where the first dimension cycles over
+            different sets of parameters.
+        stellar_model : lightning.stellar.StellarModel
+            The stellar model.
+        sfh : lightning.sfh.PiecewiseConstSFH or lightning.sfh.FunctionalSFH
+            The star formation history model.
+        sfh_params : np.ndarray(Nmodels, Nparams_sfh) or np.ndarray(Nparams_sfh)
+            The parameters for the SFH.
+        exptau : np.ndarray(Nmodels, Nwave) or np.ndarray(Nwave)
+            The e(-tau) absorption curve.
+
+        Outputs
+        -------
+        countrate : np.ndarray(Nmodels, Nwave) or np.ndarray(Nwave)
+            Count-rate density in counts s-1 Hz-1.
+
+        Notes
+        -----
+        - The absorption free count-rate spectrum is not returned by default. It can
+          be accessed by setting exptau to ``None``.
+
+        '''
 
         if (len(params.shape) == 1):
             params = params.reshape(-1,1)
@@ -154,8 +213,11 @@ class StellarPlaw(XrayPlawExpcut):
         # used for anything.
         lnu_obs, _ = self.get_model_lnu_hires(params, stellar_model, sfh, sfh_params, exptau=exptau)
 
+        if (Nmodels == 1):
+            lnu_obs = lnu_obs.reshape(1,-1)
+
         countrate = np.log10(1 / (4 * np.pi)) - 2 * np.log10(self._DL_cm) + \
-                    np.log10(lnu_obs) + np.log10(self.specresp) - np.log10(self.phot_energ)
+                    np.log10(lnu_obs) + np.log10(self.specresp[None, :]) - np.log10(self.phot_energ[None,:])
 
         countrate = 10 ** countrate
 
@@ -167,6 +229,34 @@ class StellarPlaw(XrayPlawExpcut):
         return countrate
 
     def get_model_lnu(self, params, stellar_model, sfh, sfh_params, exptau=None):
+        '''Construct the bandpass-convolved SED in Lnu.
+
+        This function takes in the stellar and SFH models in order to use the
+        stellar-age parametrization of Lx / M from Gilbertson et al. (2022).
+
+        Parameters
+        ----------
+        params : np.ndarray(Nmodels, Nparams) or np.ndarray(Nparams)
+            An array of model parameters. For purposes of vectorization
+            this can be a 2D array, where the first dimension cycles over
+            different sets of parameters.
+        stellar_model : lightning.stellar.StellarModel
+            The stellar model.
+        sfh : lightning.sfh.PiecewiseConstSFH or lightning.sfh.FunctionalSFH
+            The star formation history model.
+        sfh_params : np.ndarray(Nmodels, Nparams_sfh) or np.ndarray(Nparams_sfh)
+            The parameters for the SFH.
+        exptau : np.ndarray(Nmodels, Nwave) or np.ndarray(Nwave)
+            The e(-tau) absorption curve.
+
+        Outputs
+        -------
+        lnu_abs : np.ndarray(Nmodels, Nwave) or np.ndarray(Nwave)
+            The absorbed Lnu in the bandpasses.
+        lnu_unabs : np.ndarray(Nmodels, Nwave) or np.ndarray(Nwave)
+            The absorbtion-free Lnu in the bandpasses.
+
+        '''
 
         if (len(params.shape) == 1):
             params = params.reshape(-1,1)
@@ -201,6 +291,37 @@ class StellarPlaw(XrayPlawExpcut):
         return lmod, lmod_intr
 
     def get_model_countrate(self, params, stellar_model, sfh, sfh_params, exptau=None):
+        '''Construct the bandpass-convolved SED in count-rate.
+
+        This function takes in the stellar and SFH models in order to use the
+        stellar-age parametrization of Lx / M from Gilbertson et al. (2022).
+
+        Parameters
+        ----------
+        params : np.ndarray(Nmodels, Nparams) or np.ndarray(Nparams)
+            An array of model parameters. For purposes of vectorization
+            this can be a 2D array, where the first dimension cycles over
+            different sets of parameters.
+        stellar_model : lightning.stellar.StellarModel
+            The stellar model.
+        sfh : lightning.sfh.PiecewiseConstSFH or lightning.sfh.FunctionalSFH
+            The star formation history model.
+        sfh_params : np.ndarray(Nmodels, Nparams_sfh) or np.ndarray(Nparams_sfh)
+            The parameters for the SFH.
+        exptau : np.ndarray(Nmodels, Nwave) or np.ndarray(Nwave)
+            The e(-tau) absorption curve.
+
+        Outputs
+        -------
+        countrate : np.ndarray(Nmodels, Nfilters) or np.ndarray(Nfilters)
+            Count-rate in the bandpasses in counts s-1.
+
+        Notes
+        -----
+        - The absorption free count-rate is not returned by default. It can
+          be accessed by setting exptau to ``None``.
+
+        '''
 
         if (len(params.shape) == 1):
             params = params.reshape(-1,1)
@@ -213,14 +334,14 @@ class StellarPlaw(XrayPlawExpcut):
 
         assert (Nmodels == sfh_params.shape[0]), 'Number of parameter sets must be consistent between power law and SFH.'
 
-        ob = self._check_bounds(params, stellar_model, sfh, sfh_params)
+        ob = self._check_bounds(params)
         if(np.any(ob)):
             raise ValueError('Given parameters are out of bounds for this model (%s).' % (self.model_name))
 
         countrate_hires = self.get_model_countrate_hires(params, stellar_model, sfh, sfh_params, exptau=exptau)
 
         if (Nmodels == 1):
-            lnu_hires = lnu_hires.reshape(1,-1)
+            countrate_hires = countrate_hires.reshape(1,-1)
 
         countrate = np.zeros((Nmodels, self.Nfilters))
 
@@ -232,6 +353,37 @@ class StellarPlaw(XrayPlawExpcut):
         return countrate
 
     def get_model_counts(self, params, stellar_model, sfh, sfh_params, exptau=None):
+        '''Construct the bandpass-convolved SED in counts.
+
+        This function takes in the stellar and SFH models in order to use the
+        stellar-age parametrization of Lx / M from Gilbertson et al. (2022).
+
+        Parameters
+        ----------
+        params : np.ndarray(Nmodels, Nparams) or np.ndarray(Nparams)
+            An array of model parameters. For purposes of vectorization
+            this can be a 2D array, where the first dimension cycles over
+            different sets of parameters.
+        stellar_model : lightning.stellar.StellarModel
+            The stellar model.
+        sfh : lightning.sfh.PiecewiseConstSFH or lightning.sfh.FunctionalSFH
+            The star formation history model.
+        sfh_params : np.ndarray(Nmodels, Nparams_sfh) or np.ndarray(Nparams_sfh)
+            The parameters for the SFH.
+        exptau : np.ndarray(Nmodels, Nwave) or np.ndarray(Nwave)
+            The e(-tau) absorption curve.
+
+        Outputs
+        -------
+        counts : np.ndarray(Nmodels, Nfilters) or np.ndarray(Nfilters)
+            Counts in the bandpasses.
+
+        Notes
+        -----
+        - The absorption free counts are not returned by default. They can
+          be accessed by setting exptau to ``None``.
+
+        '''
 
         if (len(params.shape) == 1):
             params = params.reshape(-1,1)
