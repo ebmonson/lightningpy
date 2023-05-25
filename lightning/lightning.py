@@ -1456,11 +1456,12 @@ class Lightning:
 
             if priors is not None:
                 assert (Nparams == len(priors)), "Number of priors (%d) does not match number of parameters in the model (%d)." % (len(priors), Nparams)
-                prior_arr = np.zeros((np.count_nonzero(ib_mask), Nparams))
+                prior_arr = 1 + np.zeros((np.count_nonzero(ib_mask), Nparams))
                 for i,p in enumerate(priors):
                     if p is not None:
                         prior_arr[:,i] = p(params[ib_mask,i])
-                log_prior[ib_mask] = np.log(np.sum(prior_arr, axis=1))
+                log_prior[ib_mask] = np.log(np.prod(prior_arr, axis=1))
+                #print(np.prod(prior_arr, axis=1)[0])
 
             log_like = np.zeros(Nmodels)
 
@@ -1468,8 +1469,8 @@ class Lightning:
 
             log_prob = log_like + log_prior
 
-            # print('log prior:', log_prior[0])
-            # print('log like:', log_like[0])
+            #print('log prior:', log_prior[0])
+            #print('log like:', log_like[0])
 
         else:
 
