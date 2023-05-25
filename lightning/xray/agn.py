@@ -53,7 +53,7 @@ class AGNPlaw(XrayPlawExpcut):
     param_names = ['PhoIndex', 'LR17_delta']
     param_descr = ['Photon index', 'Deviation from LR17 relationship.']
     param_bounds = np.array([[-2.0, 9.0],
-                             [-0.6, 0.6]]) # Set the limits on this to 2 sigma of the intrinsic scatter
+                             [-np.inf, np.inf]]) # Set the limits on this to 2 sigma of the intrinsic scatter
 
     def get_model_lnu_hires(self, params, agn_model, agn_params, exptau=None):
         '''Construct the high-resolution spectrum in Lnu.
@@ -391,10 +391,12 @@ class Qsosed(XrayEmissionModel):
     model_name = 'QSOSED'
     model_type = 'gridded'
     gridded = True
-    param_names = ['M_SMBH', 'log_mdot']
-    param_descr = ['Supermassive black hole mass.',
-                   'log10 of the Eddington ratio.']
-    param_bounds = np.array([[1e5, 1e10],
+    param_names = ['log_M_SMBH', 'log_mdot']
+    param_descr = ['log10 of the supermassive black hole mass',
+                   'log10 of the Eddington ratio']
+    # param_bounds = np.array([[1e5, 1e10],
+    #                          [-1.5, 0.3]])
+    param_bounds = np.array([[5, 10],
                              [-1.5, 0.3]])
 
     def _construct_model(self, wave_grid=None):
@@ -497,9 +499,14 @@ class Qsosed(XrayEmissionModel):
         if(np.any(ob)):
             raise ValueError('Given parameters are out of bounds for this model (%s).' % (self.model_name))
 
+        # params[:,0] = 10 ** params[:,0]
+        mass = 10 ** params[:,0]
+        mdot = params[:,1]
+        params_tmp = np.stack([mass, mdot], axis=1)
+
         lnu = 10 ** interpn((self._mass_vec, self._mdot_vec),
                              np.log10(self.Lnu_rest),
-                             params,
+                             params_tmp,
                              method='linear',
                              bounds_error=False,
                              fill_value=0.0)
@@ -542,9 +549,15 @@ class Qsosed(XrayEmissionModel):
         if(np.any(ob)):
             raise ValueError('Given parameters are out of bounds for this model (%s).' % (self.model_name))
 
+        #params[:,0] = 10 ** params[:,0]
+        mass = 10 ** params[:,0]
+        mdot = params[:,1]
+        params_tmp = np.stack([mass, mdot], axis=1)
+        #print(params_tmp.shape)
+
         L2500 = 10 ** interpn((self._mass_vec, self._mdot_vec),
                                np.log10(self.L2500),
-                               params,
+                               params_tmp,
                                method='linear',
                                bounds_error=False,
                                fill_value=0.0)
@@ -749,6 +762,7 @@ class Qsosed(XrayEmissionModel):
 
         #assert (Nmodels == agn_params.shape[0]), 'Number of parameter sets must be consistent between power law and AGN.'
 
+        #print(params)
         ob = self._check_bounds(params)
         if(np.any(ob)):
             raise ValueError('Given parameters are out of bounds for this model (%s).' % (self.model_name))
@@ -766,5 +780,7 @@ class Qsosed(XrayEmissionModel):
             nu_min = np.amin(self.nu_grid_obs[np.nonzero(self.filters[filter_label])])
 
             counts[:,i] = self.exposure * (nu_max - nu_min) * countrate[:,i]
+
+        #print(counts[0,:])
 
         return counts
