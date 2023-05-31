@@ -14,6 +14,7 @@ class AnalyticAtten:
     Nparams = None
     param_names = ['None']
     param_descr = ['None']
+    param_names_fncy = [r'None']
     param_bounds = np.array([-np.inf, np.inf]).reshape(1,2)
 
     def __init__(self, wave):

@@ -15,6 +15,7 @@ class FunctionalSFH:
     Nparams = None
     param_names = ['None']
     param_descr = ['None']
+    param_names_fncy = [r'None']
     param_bounds = np.array([None, None])
 
 
@@ -162,6 +163,7 @@ class PiecewiseConstSFH:
 
         self.param_names = ['psi_%d' % (i + 1) for i in np.arange(self.Nparams)]
         self.param_descr = ['SFR in stellar age bin %d' % (i + 1) for i in np.arange(self.Nparams)]
+        self.param_names_fncy = [r'$\psi_%d$' % (i + 1) for i in np.arange(self.Nparams)]
         self.param_bounds = np.zeros((self.Nparams, 2))
         self.param_bounds[:,0] = 0
         self.param_bounds[:,1] = np.inf
