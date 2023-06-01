@@ -1461,7 +1461,6 @@ class Lightning:
                     if p is not None:
                         prior_arr[:,i] = p(params[ib_mask,i])
                 log_prior[ib_mask] = np.log(np.prod(prior_arr, axis=1))
-                #print(np.prod(prior_arr, axis=1)[0])
 
             log_like = np.zeros(Nmodels)
 

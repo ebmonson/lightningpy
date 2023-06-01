@@ -68,6 +68,7 @@ class DustModel(BaseEmissionModel):
                    'Radiation field maximum intensity',
                    'Fraction of dust mass exposed to radiation field intensity distribution',
                    'Fraction of dust mass composed of PAH grains']
+    param_names_fncy = [r'$\alpha$', r'$U_{\rm min}$', r'$U_{\rm max}$', r'$\gamma$', r'$q_{\rm PAH}$']
     param_bounds = np.array([[-10.0, 4.0],
                              [0.1, 25.0],
                              [1.0e3, 3.0e5],

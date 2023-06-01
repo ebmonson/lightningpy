@@ -16,6 +16,7 @@ class DelayedExponentialSFH(FunctionalSFH):
     param_names = ['dexp_norm', 'dexp_tau']
     param_descr = ['Normalization of the SFH: int(sfr(t), 0, inf) = dexp_norm * dexp_tau',
                    'Time delay / decay constant of the SFH']
+    param_names_fncy = [r'$\rm Norm_{SFH}$', r'$\tau_{\rm SFH}$']
     param_bounds = np.array([[0.0, np.inf],
                              [1, 1.4e10]])
 

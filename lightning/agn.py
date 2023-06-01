@@ -55,6 +55,7 @@ class AGNModel(BaseEmissionModel):
     param_descr = ['Integrated luminosity of the model in log Lsun',
                    'Cosine of the inclination to the line of sight',
                    'Edge-on optical depth of the torus at 9.7 microns']
+    param_names_fncy = [r'$\log~L_{\rm AGN}$', r'$\cos~i_{\rm AGN}$', r'$\tau_{9.7}$']
     param_bounds = np.array([[6, 15],
                              [0, 1],
                              [3, 11]])
