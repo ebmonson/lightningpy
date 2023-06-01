@@ -3,6 +3,8 @@ from scipy.interpolate import interp1d
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 
+from .plots import ModelBand
+
 def ppc(lgh, samples, logprob_samples, Nrep=1000, seed=None):
     '''Compute the posterior predictive check p-value given a set of samples and a Lightning object
 
@@ -150,39 +152,23 @@ def ppc_sed(lgh, samples, logprob_samples, Nrep=1000, seed=None, ax=None, normal
     else:
         fig = ax.gcf()
 
-    # ax.violinplot(lgh.wave_obs,
-    #               (lgh.nu_obs[None,:] * Lmod_perturbed).T)
-
-    qq = np.quantile(lgh.nu_obs[None,:] * Lmod_perturbed,
-                     q=(0.005, 0.025, 0.16, 0.50, 0.84, 0.975, 0.995),
-                     axis=0)
+    med = np.median(lgh.nu_obs[None,:] * Lmod_perturbed, axis=0)
 
     if (normalize):
-        norm = qq[3]
+        norm = med
         unit_str = r'a.u.'
     else:
-        norm = np.ones_like(qq[3])
+        norm = np.ones_like(med)
         unit_str = r'$\rm L_{\odot}$'
 
-    ax.fill_between(lgh.wave_obs,
-                    qq[0] / norm, qq[-1] / norm,
-                    color='darkorange',
-                    alpha=0.2,
-                    label='99%')
-    ax.fill_between(lgh.wave_obs,
-                    qq[1] / norm, qq[-2] / norm,
-                    color='darkorange',
-                    alpha=0.3,
-                    label='95%')
-    ax.fill_between(lgh.wave_obs,
-                    qq[2] / norm, qq[-3] / norm,
-                    color='darkorange',
-                    alpha=0.4,
-                    label='68%')
-    ax.plot(lgh.wave_obs,
-            qq[3] / norm,
-            color='darkorange',
-            label='Median')
+    band = ModelBand(lgh.wave_obs)
+    for mod in Lmod_perturbed:
+        band.add(lgh.nu_obs * mod / norm)
+
+    band.shade(q=(0.005, 0.995), color='darkorange', alpha=0.2, label='99%', ax=ax)
+    band.shade(q=(0.025, 0.975), color='darkorange', alpha=0.3, label='95%', ax=ax)
+    band.shade(q=(0.160, 0.840), color='darkorange', alpha=0.4, label='68%', ax=ax)
+    band.line(q=0.5, color='darkorange', label='Median', ax=ax)
 
     ax.scatter(lgh.wave_obs,
                lgh.nu_obs * lgh.Lnu_obs / norm,
