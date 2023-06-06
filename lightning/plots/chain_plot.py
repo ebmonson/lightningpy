@@ -32,7 +32,7 @@ def chain_plot(lgh, samples, plot_median=True, median_color='darkorange', **kwar
     chain_shape = samples.shape
     Nsamples = chain_shape[0]
 
-    const_dim = np.var(samples, axis=0) == 0
+    const_dim = np.var(samples, axis=0) < 1e-10
     var_dim = ~const_dim
     Nvar = np.count_nonzero(var_dim)
 

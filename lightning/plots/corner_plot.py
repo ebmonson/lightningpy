@@ -25,7 +25,7 @@ def corner_plot(lgh, samples, **kwargs):
 
     '''
 
-    const_dim = np.var(samples, axis=0) == 0
+    const_dim = np.var(samples, axis=0) < 1e-10
     var_dim = ~const_dim
     Nvar = np.count_nonzero(var_dim)
 

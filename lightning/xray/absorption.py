@@ -9,6 +9,7 @@ class Tbabs(TabulatedAtten):
     Nparams = 1
     param_names = ['NH']
     param_descr = ['Hydrogen column density']
+    param_names_fncy = [r'$N_H$']
     param_bounds = np.array([0, 1e5]).reshape(1,2)
     path = 'xray/abs/tbabs.txt'
 
@@ -54,6 +55,7 @@ class Phabs(TabulatedAtten):
     Nparams = 1
     param_names = ['NH']
     param_descr = ['Hydrogen column density']
+    param_names_fncy = [r'$N_H$']
     param_bounds = np.array([0, 1e5]).reshape(1,2)
     path = 'xray/abs/phabs.txt'
 

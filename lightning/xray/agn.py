@@ -52,6 +52,7 @@ class AGNPlaw(XrayPlawExpcut):
     gridded = False
     param_names = ['PhoIndex', 'LR17_delta']
     param_descr = ['Photon index', 'Deviation from LR17 relationship.']
+    param_names_fncy = [r'$\Gamma_{\rm AGN}$', r'$\delta_{\rm AGN}$']
     param_bounds = np.array([[-2.0, 9.0],
                              [-np.inf, np.inf]]) # Set the limits on this to 2 sigma of the intrinsic scatter
 
@@ -396,6 +397,7 @@ class Qsosed(XrayEmissionModel):
                    'log10 of the Eddington ratio']
     # param_bounds = np.array([[1e5, 1e10],
     #                          [-1.5, 0.3]])
+    param_names_fncy = [r'$\log M_{\rm SMBH}$', r'$\log \dot m$']
     param_bounds = np.array([[5, 10],
                              [-1.5, 0.3]])
 

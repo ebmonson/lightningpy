@@ -24,6 +24,7 @@ class XrayEmissionModel(BaseEmissionModel):
     gridded = False
     param_names = ['None']
     param_descr = ['None']
+    param_names_fncy = [r'None']
     param_bounds = np.array([None, None]).reshape(1,2)
 
     def __init__(self, filter_labels, arf, exposure, redshift,

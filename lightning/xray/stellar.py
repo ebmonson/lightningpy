@@ -68,6 +68,7 @@ class StellarPlaw(XrayPlawExpcut):
     gridded = False
     param_names = ['PhoIndex']
     param_descr = ['Photon index']
+    param_names_fncy = [r'$\Gamma_{\rm XRB}$']
     param_bounds = np.array([[-2.0, 9.0]])
 
     def get_model_lnu_hires(self, params, stellar_model, sfh, sfh_params, exptau=None):

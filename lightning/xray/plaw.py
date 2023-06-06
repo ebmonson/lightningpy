@@ -25,6 +25,7 @@ class XrayPlaw(XrayEmissionModel):
     param_names = ['Norm', 'PhoIndex']
     param_descr = ['Normalization at 1 keV (rest-frame)',
                    'Photon index']
+    param_names_fncy = [r'$\rm Norm_{plaw}$', r'$\Gamma_{\rm plaw}$']
     param_bounds = np.array([[0, np.inf],
                              [-2.0, 4.0]])
 
@@ -205,6 +206,7 @@ class XrayPlawExpcut(XrayEmissionModel):
     param_descr = ['Normalization at 1 keV (rest-frame)',
                    'Photon index',
                    'High energy cutoff location']
+    param_names_fncy = [r'$\rm Norm_{plaw}$', r'$\Gamma_{\rm plaw}$', r'$E_{\rm cut}$']
     param_bounds = np.array([[0, np.inf],
                              [-2.0, 4.0],
                              [0.0, np.inf]])
