@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 from .plots import ModelBand
 
-def ppc(lgh, samples, logprob_samples, Nrep=1000, seed=None):
+def ppc(lgh, samples, logprob_samples, Nrep=1000, seed=None, counts_dist='gaussian'):
     '''Compute the posterior predictive check p-value given a set of samples and a Lightning object
 
     Parameters
@@ -38,6 +38,8 @@ def ppc(lgh, samples, logprob_samples, Nrep=1000, seed=None):
     Notes
     -----
     The implementation of PPC here is ported from IDL Lightning.
+
+    Does not include X-ray model.
 
     '''
 
@@ -75,8 +77,38 @@ def ppc(lgh, samples, logprob_samples, Nrep=1000, seed=None):
     chi2_obs = np.nansum((lgh.Lnu_obs[None,:] - Lmod_perturbed)**2 / total_unc2, axis=-1)
     chi2_rep = np.nansum((Lmod - Lmod_perturbed)**2 / total_unc2, axis=-1)
 
+    # Now we calculate the X-ray contribution to both kinds of chi2, if applicable.
+    if ((lgh.xray_stellar_em is not None) or (lgh.xray_agn_em is not None)):
+        xray_mask = np.array(['XRAY' in s for s in lgh.filter_labels])
+        if (lgh.xray_mode == 'counts'):
+            net_counts = lgh.xray_counts
+            net_counts_unc = lgh.xray_counts_unc
+            counts_mod = lgh.get_xray_model_counts(samples[sort,:][idcs,:])
+            counts_total_unc2 = lgh.xray_counts_unc[None,:]**2 + (lgh.model_unc * counts_mod)**2
+            # We have the option here, of perturbing our model counts by assuming that they're
+            # Poisson distributed, or by assuming that they follow a Gaussian distribution with the
+            # same uncertainty we've previously assumed for the data.
+            if (counts_dist.lower() == 'poisson'):
+                counts_perturbed = rng.poisson(lam=counts_mod)
+            elif (counts_dist.lower() == 'gaussian'):
+                counts_perturbed = rng.normal(loc=counts_mod, scale=np.sqrt(counts_total_unc2))
+            else:
+                raise ValueError("'counts_dist' must be either 'poisson' or 'gaussian'.")
 
-    # Note that we have not yet calculate the X-ray contribution to chi2
+            xray_chi2_obs = np.nansum((net_counts[None,xray_mask] - counts_perturbed[:,xray_mask]) ** 2 / counts_total_unc2[:,xray_mask], axis=-1)
+            xray_chi2_rep = np.nansum((counts_mod[:,xray_mask] - counts_perturbed[:,xray_mask]) ** 2 / counts_total_unc2[:,xray_mask], axis=-1)
+
+        else:
+            Lmod_xray,_ = lgh.get_xray_model_lnu(samples[sort,:][idcs,:])
+            xray_total_unc2 = lgh.Lnu_unc[None,:]**2 + (lgh.model_unc * Lmod_xray)**2
+
+            Lmod_xray_perturbed = rng.normal(loc=Lmod_xray, scale=np.sqrt(xray_total_unc2))
+
+            xray_chi2_obs = np.nansum((lgh.Lnu_obs[None,xray_mask] - Lmod_xray_perturbed[:,xray_mask])**2 / xray_total_unc2[:,xray_mask], axis=-1)
+            xray_chi2_rep = np.nansum((Lmod_xray[:,xray_mask] - Lmod_xray_perturbed[:,xray_mask])**2 / xray_total_unc2[:,xray_mask], axis=-1)
+
+        chi2_obs += xray_chi2_obs
+        chi2_rep += xray_chi2_rep
 
     # The p-value is then the fraction of samples with new chi2 greater than the
     # old chi2
@@ -84,7 +116,7 @@ def ppc(lgh, samples, logprob_samples, Nrep=1000, seed=None):
 
     return p_value, chi2_rep, chi2_obs
 
-def ppc_sed(lgh, samples, logprob_samples, Nrep=1000, seed=None, ax=None, normalize=False):
+def ppc_sed(lgh, samples, logprob_samples, Nrep=1000, seed=None, ax=None, normalize=False, counts_dist='gaussian'):
     '''Make an SED plot representing the posterior predictive check.
 
     The idea is that this can serve as a diagnostic plot showing where the model may
@@ -119,6 +151,10 @@ def ppc_sed(lgh, samples, logprob_samples, Nrep=1000, seed=None, ax=None, normal
     PPC SED plot figure: an SED plot showing the quantile bands of the reproduced
     data, with the observed data overplotted.
 
+    Notes
+    -----
+    Does not include X-ray model.
+
     '''
 
     rng = np.random.default_rng(seed)
@@ -129,6 +165,10 @@ def ppc_sed(lgh, samples, logprob_samples, Nrep=1000, seed=None, ax=None, normal
     pdf = np.exp(logprob_samples)[sort]
     cdf = np.cumsum(pdf)
     cdf /= np.amax(cdf)
+
+    # We need these for the case where
+    # the X-ray model was fit with counts
+    bestfit_samples = samples[sort,:][-1,:]
 
     # Invert the CDF to get the index.
     finterp = interp1d(cdf, np.arange(len(cdf)), kind='nearest')
@@ -145,8 +185,6 @@ def ppc_sed(lgh, samples, logprob_samples, Nrep=1000, seed=None, ax=None, normal
     total_unc2 = lgh.Lnu_unc[None,:]**2 + (lgh.model_unc * Lmod)**2
     Lmod_perturbed = rng.normal(loc=Lmod, scale=np.sqrt(total_unc2))
 
-    # Note that the X-rays are not included yet.
-
     if ax is None:
         fig, ax = plt.subplots()
     else:
@@ -161,9 +199,12 @@ def ppc_sed(lgh, samples, logprob_samples, Nrep=1000, seed=None, ax=None, normal
         norm = np.ones_like(med)
         unit_str = r'$\rm L_{\odot}$'
 
-    band = ModelBand(lgh.wave_obs)
+    # The filters might not be in ascending order of
+    # wavelength, so we sort them here.
+    wave_idcs = np.argsort(lgh.wave_obs)
+    band = ModelBand(lgh.wave_obs[wave_idcs])
     for mod in Lmod_perturbed:
-        band.add(lgh.nu_obs * mod / norm)
+        band.add(lgh.nu_obs[wave_idcs] * mod[wave_idcs] / norm[wave_idcs])
 
     band.shade(q=(0.005, 0.995), color='darkorange', alpha=0.2, label='99%', ax=ax)
     band.shade(q=(0.025, 0.975), color='darkorange', alpha=0.3, label='95%', ax=ax)
@@ -176,6 +217,70 @@ def ppc_sed(lgh, samples, logprob_samples, Nrep=1000, seed=None, ax=None, normal
                color='k',
                zorder=10,
                label='Data')
+
+    # Now we calculate the X-ray contribution to both kinds of chi2, if applicable.
+    if ((lgh.xray_stellar_em is not None) or (lgh.xray_agn_em is not None)):
+        xray_mask = np.array(['XRAY' in s for s in lgh.filter_labels])
+
+        if (lgh.xray_stellar_em is not None):
+            xray_wave_obs = lgh.xray_stellar_em.wave_obs
+            xray_nu_obs = lgh.xray_stellar_em.nu_obs
+        else:
+            xray_wave_obs = lgh.xray_agn_em.wave_obs
+            xray_nu_obs = lgh.xray_agn_em.nu_obs
+
+        if (lgh.xray_mode == 'counts'):
+            # net_counts = lgh.xray_counts
+            # net_counts_unc = lgh.xray_counts_unc
+            counts_best = lgh.get_xray_model_counts(bestfit_samples)
+            lnu_xray_best,_ = lgh.get_xray_model_lnu(bestfit_samples)
+            lnu_obs_xray = lgh.xray_counts[xray_mask] / counts_best[xray_mask]  * lnu_xray_best[xray_mask]
+
+            Lmod_xray,_ = lgh.get_xray_model_lnu(samples[sort,:][idcs,:])
+            counts_mod = lgh.get_xray_model_counts(samples[sort,:][idcs,:])
+            counts_total_unc2 = lgh.xray_counts_unc[None,:]**2 + (lgh.model_unc * counts_mod)**2
+            # We have the option here, of perturbing our model counts by assuming that they're
+            # Poisson distributed, or by assuming that they follow a Gaussian distribution with the
+            # same uncertainty we've previously assumed for the data.
+            if (counts_dist.lower() == 'poisson'):
+                counts_perturbed = rng.poisson(lam=counts_mod)
+            elif (counts_dist.lower() == 'gaussian'):
+                counts_perturbed = rng.normal(loc=counts_mod, scale=np.sqrt(counts_total_unc2))
+            else:
+                raise ValueError("'counts_dist' must be either 'poisson' or 'gaussian'.")
+
+            Lmod_xray_perturbed = lgh.xray_counts[None,xray_mask] / counts_perturbed[:,xray_mask] * Lmod_xray[:,xray_mask]
+
+        else:
+            lnu_obs_xray = lgh.Lnu_obs[xray_mask]
+
+            Lmod_xray,_ = lgh.get_xray_model_lnu(samples[sort,:][idcs,:])
+            xray_total_unc2 = lgh.Lnu_unc[None,:]**2 + (lgh.model_unc * Lmod_xray)**2
+
+            Lmod_xray_perturbed = rng.normal(loc=Lmod_xray, scale=np.sqrt(xray_total_unc2))[:,xray_mask]
+
+        xray_med = np.median(xray_nu_obs[xray_mask] * Lmod_xray_perturbed, axis=0)
+
+        xray_wave_idcs = np.argsort(xray_wave_obs[xray_mask])
+        xray_band = ModelBand(xray_wave_obs[xray_mask][xray_wave_idcs])
+        if (normalize):
+            xray_norm = xray_med
+        else:
+            xray_norm = np.ones_like(xray_med)
+
+        for mod in Lmod_xray_perturbed:
+            xray_band.add(xray_nu_obs[xray_mask][xray_wave_idcs] * mod[xray_wave_idcs] / xray_norm[xray_wave_idcs])
+
+        xray_band.shade(q=(0.005, 0.995), color='darkorange', alpha=0.2, ax=ax)
+        xray_band.shade(q=(0.025, 0.975), color='darkorange', alpha=0.3, ax=ax)
+        xray_band.shade(q=(0.160, 0.840), color='darkorange', alpha=0.4, ax=ax)
+        xray_band.line(q=0.5, color='darkorange', ax=ax)
+
+        ax.scatter(xray_wave_obs[xray_mask],
+                   xray_nu_obs[xray_mask] * lnu_obs_xray / xray_norm,
+                   marker='x',
+                   color='k',
+                   zorder=10)
 
     ax.set_xscale('log')
     ax.set_yscale('log')

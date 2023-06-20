@@ -263,7 +263,7 @@ class PiecewiseConstSFH:
 
         assert (len(self.age) - 1 == arr.shape[0]), "Number of stellar age bins in SFH model and stellar model must match."
         if self.Nparams is not None:
-            assert (self.Nparams == params.shape[1]), "Number of parameters must match the number (%d) expected by this model (%s)" % (self.Nparams, self.model_name)
+            assert (self.Nparams == params.shape[1]), "Number of parameters provided (%d) must match the number (%d) expected by this model (%s)" % (params.shape[1], self.Nparams, self.model_name)
         # The input array might be a spectrum, with shape (Nages, Nwave)
         if (len(arr.shape) == 2):
             arr2d = True

@@ -11,7 +11,7 @@ from .base import AnalyticAtten
 
 class CalzettiAtten(AnalyticAtten):
     '''
-        Featureless Calzetti+(2000) attenuation curve.
+    Featureless Calzetti+(2000) attenuation curve.
     '''
 
     type = 'analytic'
@@ -27,10 +27,16 @@ class CalzettiAtten(AnalyticAtten):
         self.wave = wave
         self.Nwave = len(self.wave)
 
+    def get_AV(self, params):
+        '''
+        Helper function to convert tauV -> AV
+        '''
+
+        return 2.5 * params[:,0] / np.log(10)
 
     def evaluate(self, params):
         '''
-            Model includes a featureless Calzetti law.
+        Model includes a featureless Calzetti law.
         '''
 
         klam = np.zeros_like(self.wave) # k_lambda, the opacity as a function of wavelength?
@@ -78,8 +84,8 @@ class CalzettiAtten(AnalyticAtten):
 
 class ModifiedCalzettiAtten(AnalyticAtten):
     '''
-        The Noll+(2009) modification of the Calzetti+(2000) attenuation curve,
-        including a Drude-profile bump at 2175 Å and a variable UV slope.
+    The Noll+(2009) modification of the Calzetti+(2000) attenuation curve,
+    including a Drude-profile bump at 2175 Å and a variable UV slope.
     '''
 
     type = 'analytic'
@@ -99,20 +105,26 @@ class ModifiedCalzettiAtten(AnalyticAtten):
         self.wave = wave
         self.Nwave = len(self.wave)
 
+    def get_AV(self, params):
+        '''
+        Helper function to convert tauV -> AV
+        '''
+
+        return 2.5 * params[:,0] / np.log(10)
 
     def evaluate(self, params):
         '''
-            Model includes a featureless Calzetti law, with the
-            addition of a UV bump at 2175 A and optionally extra birth cloud
-            extinction. The same attenuation model used in most cases by
-            Lightning; I ported it from the Lightning IDL source.
+        Model includes a featureless Calzetti law, with the
+        addition of a UV bump at 2175 A and optionally extra birth cloud
+        extinction. The same attenuation model used in most cases by
+        Lightning; I ported it from the Lightning IDL source.
 
-            As of right now the birth cloud component should be ignored, it isn't really
-            implemented properly at the moment -- it'll be applied to all ages if you set
-            tauV_BC > 0.
+        As of right now the birth cloud component should be ignored, it isn't really
+        implemented properly at the moment -- it'll be applied to all ages if you set
+        tauV_BC > 0.
 
-            If I were willing to be a little more clever, I would define this more obviously
-            as an extension of the CalzettiAtten class.
+        If I were willing to be a little more clever, I would define this more obviously
+        as an extension of the CalzettiAtten class.
         '''
 
         klam = np.zeros_like(self.wave)

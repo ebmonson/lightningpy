@@ -106,11 +106,11 @@ class AGNModel(BaseEmissionModel):
         # self.Lnu_obs_transparent = (1 + self.redshift) * self.Lnu_rest_transparent
         # self.Lnu_obs_integrated = (1 + self.redshift) * self.Lnu_rest_integrated
 
-        if (wave_grid is not None):
+        lnu_total = source_table['LNU_TOTAL'].data.reshape(10,5,132)
+        lnu_transp = source_table['LNU_TRANSPARENT'].data.reshape(10,5,132)
+        lnu_int = source_table['LNU_INTEGRATED'].data.reshape(10,5,132)
 
-            lnu_total = source_table['LNU_TOTAL'].data.reshape(10,5,132)
-            lnu_transp = source_table['LNU_TRANSPARENT'].data.reshape(10,5,132)
-            lnu_int = source_table['LNU_INTEGRATED'].data.reshape(10,5,132)
+        if (wave_grid is not None):
 
             finterp_total = interp1d(wave_model, lnu_total, bounds_error=False, fill_value=0.0, axis=2)
             finterp_transp = interp1d(wave_model, lnu_transp, bounds_error=False, fill_value=0.0, axis=2)
@@ -138,17 +138,26 @@ class AGNModel(BaseEmissionModel):
             self.wave_grid_obs = self.wave_grid_rest * (1 + self.redshift)
             self.nu_grid_rest = nu_model
             self.nu_grid_obs = self.nu_grid_rest * (1 + self.redshift)
-            self.Lnu_rest = source_table['LNU_TOTAL'].data.reshape(10,5,132)
-            self.Lnu_rest_transparent = source_table['LNU_TRANSPARENT'].data.reshape(10,5,132)
-            self.Lnu_rest_integrated = source_table['LNU_INTEGRATED'].data.reshape(10,5,132)
+            self.Lnu_rest = lnu_total
+            self.Lnu_rest_transparent = lnu_transp
+            self.Lnu_rest_integrated = lnu_int
 
         self.Lnu_obs = (1 + self.redshift) * self.Lnu_rest
         self.Lnu_obs_transparent = (1 + self.redshift) * self.Lnu_rest_transparent
         self.Lnu_obs_integrated = (1 + self.redshift) * self.Lnu_rest_integrated
 
+        finterp_transp = interp1d(wave_model, lnu_transp, axis=2)
+        L2500_grid = finterp_transp(0.25)
+
+        self.L2500_rest = L2500_grid
+        self.Lbol = trapz(lnu_transp[:,:,::-1], nu_model[::-1], axis=2)
+
+        self.L2500_norm = self.L2500_rest / self.Lbol
+
+
     def _construct_model_grid(self):
         '''
-        This code is executed after _get_filters (and is required in this case).
+        This code is executed after _get_filters (and is not required in this case).
         '''
         pass
 
