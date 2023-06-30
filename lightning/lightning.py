@@ -3,11 +3,14 @@
 '''An object-oriented interface for Lightning.
 
     TODO:
-    - Whole X-ray thing
-        - Counts mode
     - Move imports around, to only where they're needed?
     - Standardize variable names
     - Documentation
+    - Throughout the whole package we use (abuse?) the fact that
+      np.log(0) := -np.inf for the computation of log probabilities.
+      This works as intended in general, but generates lots of warning
+      messages, which may lead an end user to believe that something is
+      wrong when everything is working as intended.
 '''
 
 # Standard library
@@ -29,7 +32,7 @@ from astropy.io import ascii
 from .sfh import PiecewiseConstSFH
 from .sfh.delayed_exponential import DelayedExponentialSFH
 from .stellar import StellarModel
-from .dust import DustModel # Move inside setup function where needed?
+from .dust import DL07Dust as DustModel # Move inside setup function where needed?
 from .agn import AGNModel # Move inside setup function where needed?
 from .xray import StellarPlaw, AGNPlaw, Qsosed
 from .xray.absorption import Tbabs, Phabs
@@ -132,6 +135,7 @@ class Lightning:
                  atten_type='Modified-Calzetti',
                  dust_emission=False,
                  agn_emission=False,
+                 agn_polar_dust=False,
                  xray_mode='counts',
                  xray_stellar_emission=None,
                  xray_agn_emission=None,
@@ -325,6 +329,7 @@ class Lightning:
 
         # Set up AGN emission
         if(agn_emission):
+            self.agn_polar_dust = agn_polar_dust
             self._setup_agn()
         else:
             self.agn = None
@@ -562,7 +567,7 @@ class Lightning:
         Initialize AGN emission model.
         '''
 
-        self.agn = AGNModel(self.filter_labels, self.redshift, wave_grid=self.wave_grid_rest)
+        self.agn = AGNModel(self.filter_labels, self.redshift, wave_grid=self.wave_grid_rest, polar_dust=self.agn_polar_dust)
 
     def _setup_xray_absorption(self):
         '''
@@ -737,7 +742,10 @@ class Lightning:
 
         if (self.agn is not None):
 
-            lnu_agn = self.agn.get_model_lnu_hires(agn_params, exptau=expminustau)
+            if (self.agn_polar_dust):
+                lnu_agn = self.agn.get_model_lnu_hires(agn_params, exptau=None)
+            else:
+                lnu_agn = self.agn.get_model_lnu_hires(agn_params, exptau=expminustau)
 
             if (self.xray_agn_em_type == 'QSOSED'):
                 #raise NotImplementedError
@@ -953,7 +961,11 @@ class Lightning:
             hires_models['dust'] = lnu_dust
 
         if (self.agn is not None):
-            lnu_agn = self.agn.get_model_lnu_hires(agn_params, exptau=expminustau)
+
+            if (self.agn_polar_dust):
+                lnu_agn = self.agn.get_model_lnu_hires(agn_params, exptau=None)
+            else:
+                lnu_agn = self.agn.get_model_lnu_hires(agn_params, exptau=expminustau)
 
             if (self.xray_agn_em_type == 'QSOSED'):
                 # Calculate L2500 from the QSOSED model and the L2500 of the SKIRTOR model

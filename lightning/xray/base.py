@@ -87,8 +87,10 @@ class XrayEmissionModel(BaseEmissionModel):
         self.specresp = specresp_interp
 
         # Allow for non-uniform specification of exposure time by
-        # letting exposure be an array
-        if (not isinstance(exposure, numbers.Number)):
+        # letting exposure be either a scalar or an array
+        if (isinstance(exposure, numbers.Number)):
+            exposure = np.full(len(filter_labels), exposure, dtype='float')
+        else:
             assert(len(exposure) == len(filter_labels)), "Exposure time should be either a scalar or an array with one element per bandpass."
             exposure = np.array(exposure, dtype='float')
 

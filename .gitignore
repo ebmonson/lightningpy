@@ -8,6 +8,7 @@ testbench.ipynb
 *_test.ipynb
 *_test.py
 *_chains.npy
+chains/*
 *.py~
 
 lightning/recycling_bin/

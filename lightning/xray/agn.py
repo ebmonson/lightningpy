@@ -374,7 +374,7 @@ class AGNPlaw(XrayPlawExpcut):
             nu_max = np.amax(self.nu_grid_obs[np.nonzero(self.filters[filter_label])])
             nu_min = np.amin(self.nu_grid_obs[np.nonzero(self.filters[filter_label])])
 
-            counts[:,i] = self.exposure * (nu_max - nu_min) * countrate[:,i]
+            counts[:,i] = self.exposure[i] * (nu_max - nu_min) * countrate[:,i]
 
         return counts
 
@@ -781,7 +781,7 @@ class Qsosed(XrayEmissionModel):
             nu_max = np.amax(self.nu_grid_obs[np.nonzero(self.filters[filter_label])])
             nu_min = np.amin(self.nu_grid_obs[np.nonzero(self.filters[filter_label])])
 
-            counts[:,i] = self.exposure * (nu_max - nu_min) * countrate[:,i]
+            counts[:,i] = self.exposure[i] * (nu_max - nu_min) * countrate[:,i]
 
         #print(counts[0,:])
 

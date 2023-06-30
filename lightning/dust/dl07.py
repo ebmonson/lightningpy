@@ -1,27 +1,18 @@
-#!/usr/bin/env python
-
-'''
-    dust.py
-
-    Class interfaces for dust attenuation and emission modeling.
-    Ported from IDL Lightning.
-'''
-
 import numpy as np
 from scipy.integrate import trapz
 from scipy.interpolate import interp1d
 import astropy.constants as const
 import astropy.units as u
 
-from .base import BaseEmissionModel
+from ..base import BaseEmissionModel
 
-__all__ = ['DustModel']
+__all__ = ['DL07Dust']
 
 #################################
 # Dust Emission
 #################################
 
-class DustModel(BaseEmissionModel):
+class DL07Dust(BaseEmissionModel):
     '''An implementation of the Draine & Li (2007) dust emission models.
 
     A fraction ``gamma`` of the dust is exposed to a radiation field such
