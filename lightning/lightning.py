@@ -821,15 +821,15 @@ class Lightning:
                 expminustau_agn = self.xray_abs_intr.evaluate(xray_abs_params)
                 expminustau_stellar = self.xray_abs_intr.evaluate(NH_stellar)
             elif (self.xray_stellar_em is not None):
-                expminustau_agn = np.ones_like((Nmodels, self.xray_wave_grid_rest))
+                expminustau_agn = np.ones((Nmodels, len(self.xray_wave_grid_rest)))
                 expminustau_stellar = self.xray_abs_intr.evaluate(xray_abs_params)
             elif (self.xray_agn_em is not None):
                 expminustau_agn = self.xray_abs_intr.evaluate(xray_abs_params)
-                expminustau_stellar = np.ones_like((Nmodels, self.xray_wave_grid_rest))
+                expminustau_stellar = np.ones((Nmodels, len(self.xray_wave_grid_rest)))
         else:
-            expminustau_gal = np.ones_like(self.xray_wave_grid_rest)
-            expminustau_stellar = np.ones_like((Nmodels, self.xray_wave_grid_rest))
-            expminustau_agn = np.ones_like((Nmodels, self.xray_wave_grid_rest))
+            expminustau_gal = np.ones(len(self.xray_wave_grid_rest))
+            expminustau_stellar = np.ones((Nmodels, len(self.xray_wave_grid_rest)))
+            expminustau_agn = np.ones((Nmodels, len(self.xray_wave_grid_rest)))
 
         if (Nmodels == 1):
             expminustau_stellar = expminustau_stellar.reshape(1,-1)
@@ -969,15 +969,15 @@ class Lightning:
                 expminustau_agn = self.xray_abs_intr.evaluate(xray_abs_params)
                 expminustau_stellar = self.xray_abs_intr.evaluate(NH_stellar)
             elif (self.xray_stellar_em is not None):
-                expminustau_agn = np.ones_like((Nmodels, self.xray_wave_grid_rest))
+                expminustau_agn = np.ones((Nmodels, len(self.xray_wave_grid_rest)))
                 expminustau_stellar = self.xray_abs_intr.evaluate(xray_abs_params)
             elif (self.xray_agn_em is not None):
                 expminustau_agn = self.xray_abs_intr.evaluate(xray_abs_params)
-                expminustau_stellar = np.ones_like((Nmodels, self.xray_wave_grid_rest))
+                expminustau_stellar = np.ones((Nmodels, len(self.xray_wave_grid_rest)))
         else:
-            expminustau_gal = np.ones_like(self.xray_wave_grid_rest)
-            expminustau_stellar = np.ones_like((Nmodels, self.xray_wave_grid_rest))
-            expminustau_agn = np.ones_like((Nmodels, self.xray_wave_grid_rest))
+            expminustau_gal = np.ones(len(self.xray_wave_grid_rest))
+            expminustau_stellar = np.ones((Nmodels, len(self.xray_wave_grid_rest)))
+            expminustau_agn = np.ones((Nmodels, len(self.xray_wave_grid_rest)))
 
         if (self.xray_stellar_em is not None):
             lnu_xray_stellar_abs, lnu_xray_stellar_unabs = self.xray_stellar_em.get_model_lnu_hires(st_xray_params,
@@ -1138,15 +1138,15 @@ class Lightning:
                 expminustau_agn = self.xray_abs_intr.evaluate(xray_abs_params)
                 expminustau_stellar = self.xray_abs_intr.evaluate(NH_stellar)
             elif (self.xray_stellar_em is not None):
-                expminustau_agn = np.ones_like((Nmodels, self.xray_wave_grid_rest))
+                expminustau_agn = np.ones((Nmodels, len(self.xray_wave_grid_rest)))
                 expminustau_stellar = self.xray_abs_intr.evaluate(xray_abs_params)
             elif (self.xray_agn_em is not None):
                 expminustau_agn = self.xray_abs_intr.evaluate(xray_abs_params)
-                expminustau_stellar = np.ones_like((Nmodels, self.xray_wave_grid_rest))
+                expminustau_stellar = np.ones((Nmodels, len(self.xray_wave_grid_rest)))
         else:
-            expminustau_gal = np.ones_like(self.xray_wave_grid_rest)
-            expminustau_stellar = np.ones_like((Nmodels, self.xray_wave_grid_rest))
-            expminustau_agn = np.ones_like((Nmodels, self.xray_wave_grid_rest))
+            expminustau_gal = np.ones(len(self.xray_wave_grid_rest))
+            expminustau_stellar = np.ones((Nmodels, len(self.xray_wave_grid_rest)))
+            expminustau_agn = np.ones((Nmodels, len(self.xray_wave_grid_rest)))
 
         if (Nmodels == 1):
             expminustau_stellar = expminustau_stellar.reshape(1,-1)
@@ -1249,15 +1249,15 @@ class Lightning:
                 expminustau_agn = self.xray_abs_intr.evaluate(xray_abs_params)
                 expminustau_stellar = self.xray_abs_intr.evaluate(NH_stellar)
             elif (self.xray_stellar_em is not None):
-                expminustau_agn = np.ones_like((Nmodels, self.xray_wave_grid_rest))
+                expminustau_agn = np.ones((Nmodels, len(self.xray_wave_grid_rest)))
                 expminustau_stellar = self.xray_abs_intr.evaluate(xray_abs_params)
             elif (self.xray_agn_em is not None):
                 expminustau_agn = self.xray_abs_intr.evaluate(xray_abs_params)
-                expminustau_stellar = np.ones_like((Nmodels, self.xray_wave_grid_rest))
+                expminustau_stellar = np.ones((Nmodels, len(self.xray_wave_grid_rest)))
         else:
-            expminustau_gal = np.ones_like(self.xray_wave_grid_rest)
-            expminustau_stellar = np.ones_like((Nmodels, self.xray_wave_grid_rest))
-            expminustau_agn = np.ones_like((Nmodels, self.xray_wave_grid_rest))
+            expminustau_gal = np.ones(len(self.xray_wave_grid_rest))
+            expminustau_stellar = np.ones((Nmodels, len(self.xray_wave_grid_rest)))
+            expminustau_agn = np.ones((Nmodels, len(self.xray_wave_grid_rest)))
 
         if (Nmodels == 1):
             expminustau_stellar = expminustau_stellar.reshape(1,-1)
