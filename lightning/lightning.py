@@ -366,6 +366,8 @@ class Lightning:
             self.xray_agn_em = None
 
         self.galactic_NH = galactic_NH
+        self.xray_arf = xray_arf
+        self.xray_exposure = xray_exposure
 
         t7 = time.time()
 
@@ -1669,3 +1671,190 @@ class Lightning:
             ValueError('Fitting method "%s" not recognized.' % (method))
 
         return res
+
+    def get_mcmc_chains(self, sampler, thin=None, discard=None, flat=True, Nsamples=1000):
+        '''Reduce the emcee sampler object into chains and an astropy Table object with basic information.
+
+        Parameters
+        ----------
+        sampler : emcee.EnsembleSampler
+            Sampler from completed MCMC run, as returned by lightning.fit(method='emcee')
+        thin : int
+            Thin factor for chains. Note that `None` means that the thin factor will be determined
+            from the autocorrelation time; if you instead want no thinning, use thin=1. (Default: None)
+        discard : int
+            Number of trials (i.e. burn-in) to discard from the beginning of MCMC chains. Note that
+            `None` means that the burn-in will be determined from the autocorrelation time; if you
+            instead want no discard, use discard=0. (Default: None)
+        flat : bool
+            If True, collapse the ensemble sampler to a single MCMC chain. Otherwise
+            one chain per walker is retained (Default: True)
+        Nsamples : int
+            Number of posterior samples to retain after discarding/thinning/flattening (Default: 1000)
+
+        Returns
+        -------
+        samples : np.ndarray(Nsamples, Nparam)
+            Sampled posterior chain(s) for parameters.
+        logprob_samples : np.ndarray(Nsamples, Nparam)
+            Sampled logprob chain(s).
+        t : np.ndarray(Nparams,)
+            Autocorrelation time computed *before* thinning and discarding burn-in. Preserved as
+            a diagnostic, since it sets the scale for thinning and burn-in.
+        '''
+
+        import emcee
+
+        acceptance_fraction = np.mean(sampler.acceptance_fraction)
+
+        try:
+            t = sampler.get_autocorr_time()
+        except emcee.autocorr.AutocorrError as e:
+            print('WARNING: The integrated autocorrelation time is longer than N/50.')
+            print('         The autocorrelation estimate may be unreliable.')
+            if ((thin is None) or (discard is None)):
+                print('Thin/burn-in factors cannot be determined automatically.')
+                return -1
+            t = np.nan
+
+        tmax = np.amax(t)
+        if (thin is None):
+            thin = int(np.floor(0.5 * tmax))
+        if (discard is None):
+            discard = int(np.floor(2 * tmax))
+
+        samples = sampler.get_chain(thin=thin, discard=discard, flat=flat)
+        logprob_samples = sampler.get_log_prob(thin=thin, discard=discard, flat=flat)
+        # try:
+        #     tnew = sampler.get_autocorr_time(discard=discard, thin=thin)
+        # except emcee.autocorr.AutocorrError:
+        #     print('WARNING: The re-calculated integrated autocorrelation time is longer than N/50.')
+        #     print('         The autocorrelation estimate may be unreliable.')
+        #     tnew = t
+
+        return samples[-1*Nsamples:,:], logprob_samples[-1*Nsamples:], t
+
+    def _to_dict(self):
+        '''
+        Create a dict containing the minimal information needed
+        to reconstruct the Lightning object.
+
+        All types are demoted to built-in python types to allow for JSON
+        serialization, e.g. atropy.table.Table -> dict, np.ndarray -> list,
+        which can result in a loss of precision and metadata.
+        '''
+
+        # handle distance indicators specially so that the object can be reconstructed
+        # properly.
+        if ((self.redshift == 0) and (self.DL != 0)):
+            # Then the user originally specified DL rather
+            # than a redshift.
+            redshift_tmp = None
+            DL_tmp = self.DL
+        else:
+            redshift_tmp = self.redshift
+            DL_tmp = self.DL
+
+        if (self.xray_arf is not None):
+            arf_tmp = dict(self.xray_arf)
+            for key in arf_tmp: arf_tmp[key] = list(arf_tmp[key])
+        else:
+            arf_tmp = None
+
+        dict = {'filter_labels': self.filter_labels,
+                'redshift': redshift_tmp,
+                'lum_dist': DL_tmp,
+                'flux_obs': self._flux_obs.tolist(),
+                'flux_obs_unc': self._flux_unc.tolist(),
+                'wave_grid': self.wave_grid_rest.tolist(),
+                'SFH_type': self.SFH_type,
+                'ages': self.ages.tolist(),
+                'atten_type': self.atten_type,
+                'dust_emission': True if self.dust is not None else False,
+                'agn_emission': True if self.dust is not None else False,
+                'xray_mode': self.xray_mode,
+                'xray_stellar_emission': self.xray_st_em_type,
+                'xray_agn_emission': self.xray_agn_em_type,
+                'xray_absorption': self.xray_abs_type,
+                'xray_wave_grid': self.xray_wave_grid_rest.tolist() if self.xray_mode not in [None, 'None'] else None,
+                'xray_arf': arf_tmp,
+                'xray_exposure': None if self.xray_exposure is None else self.xray_exposure.tolist(),
+                'galactic_NH': self.galactic_NH,
+                'lightning_filter_path': self.path_to_filters,
+                'model_unc': self.model_unc.tolist(),
+                'cosmology': {'H0': self.cosmology._H0.value,
+                              'Om0': self.cosmology._Om0
+                              }
+                }
+
+        return dict
+
+    def save_json(self, fname):
+        '''
+        Save the information needed to recoonstruct this Lightning object to a json
+        file.
+
+        The Lightning object can be remade using ``Lightning.from_json``.
+
+        The json configuration file is in theory human readable but note that the wavelength grids
+        are reproduced in their entirety, so the file will likely be thousands of lines long.
+        '''
+
+        import json
+
+        with open(fname, 'w') as f:
+
+            json.dump(self._to_dict(),
+                      f,
+                      indent=4)
+
+    def from_json(fname):
+        '''
+        Construct a Lightning object with the configuration specified by a json file.
+        '''
+
+        import json
+
+        with open(fname, 'r') as f:
+            config = json.load(f)
+
+        lgh = Lightning(config['filter_labels'],
+                        redshift=config['redshift'],
+                        lum_dist=config['lum_dist'],
+                        flux_obs=config['flux_obs'],
+                        flux_obs_unc=config['flux_obs_unc'],
+                        wave_grid=np.array(config['wave_grid']),
+                        SFH_type=config['SFH_type'],
+                        atten_type=config['atten_type'],
+                        dust_emission=config['dust_emission'],
+                        agn_emission=config['agn_emission'],
+                        xray_mode=config['xray_mode'],
+                        xray_stellar_emission=config['xray_stellar_emission'],
+                        xray_agn_emission=config['xray_agn_emission'],
+                        xray_absorption=config['xray_absorption'],
+                        xray_wave_grid=config['xray_wave_grid'],
+                        xray_arf=config['xray_arf'],
+                        xray_exposure=config['xray_exposure'],
+                        galactic_NH=config['galactic_NH'],
+                        lightning_filter_path=config['lightning_filter_path'],
+                        print_setup_time=False,
+                        model_unc=np.array(config['model_unc']),
+                        cosmology=FlatLambdaCDM(H0=config['cosmology']['H0'], Om0=config['cosmology']['Om0'])
+                        )
+
+        return lgh
+
+    def save_pickle(self, fname):
+        '''
+        Save this whole Lightning object to a pickle.
+        This will be larger than just saving the configuration to a json file,
+        since it contains the whole object, all of the models, etc.
+
+        The normal caveats with pickles apply.
+        '''
+
+        import pickle
+
+        with open(fname, 'wb') as f:
+
+            pickle.dump(self, f)
