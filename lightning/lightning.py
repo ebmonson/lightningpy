@@ -1714,7 +1714,7 @@ class Lightning:
             print('         The autocorrelation estimate may be unreliable.')
             if ((thin is None) or (discard is None)):
                 print('Thin/burn-in factors cannot be determined automatically.')
-                return -1
+                return -1, -1, -1
             t = np.nan
 
         tmax = np.amax(t)

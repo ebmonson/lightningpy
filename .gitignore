@@ -7,7 +7,9 @@ __pycache__
 testbench.ipynb
 *_test.ipynb
 *_test.py
-chains/*
+*_chains.npy
+*_output.npy
+*.pickle
 *.py~
 
 lightning/recycling_bin/
