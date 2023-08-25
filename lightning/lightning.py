@@ -650,6 +650,61 @@ class Lightning:
         print('')
         print('Total parameters: %d' % (self.Nparams))
 
+    def _separate_params(self, params):
+
+        param_shape = params.shape # expecting ndarray(Nmodels, Nparams)
+
+        if (len(param_shape) == 1):
+            params = params.reshape(1, params.size)
+            param_shape = params.shape
+
+        Nmodels = param_shape[0]
+        Nparams = param_shape[1]
+
+        assert (Nparams == self.Nparams), 'Number of provided parameters (%d) must match the total number of parameters expected by the model (%d). Check Lightning.print_params().' % (Nparams, self.Nparams)
+
+        sfh_params = params[:, 0:self.sfh.Nparams]
+        i = self.sfh.Nparams
+        if (self.atten is not None):
+            atten_params = params[:,i:i + self.atten.Nparams]
+            i += self.atten.Nparams
+        else:
+            atten_params = None
+        if (self.dust is not None):
+            dust_params = params[:,i:i + self.dust.Nparams]
+            i += self.dust.Nparams
+        else:
+            dust_params = None
+        if (self.agn is not None):
+            agn_params = params[:,i:i + self.agn.Nparams]
+            i += self.agn.Nparams
+        else:
+            agn_params = None
+        if (self.xray_stellar_em is not None):
+            st_xray_params = params[:,i:i + self.xray_stellar_em.Nparams]
+            i += self.xray_stellar_em.Nparams
+        else:
+            st_xray_params = None
+        if (self.xray_agn_em is not None):
+            agn_xray_params = params[:,i:i + self.xray_agn_em.Nparams]
+            i += self.xray_agn_em.Nparams
+        else:
+            agn_xray_params = None
+        if (self.xray_abs_intr is not None):
+            xray_abs_params = params[:,i:i + self.xray_abs_intr.Nparams]
+            i += self.xray_abs_intr.Nparams
+        else:
+            xray_abs_params = None
+
+        # Here we could make the choice to return a dict, and yet...
+        # Dict plan: in each of the if statements above:
+        # - add a key for the model
+        # - foreach parameter, add a key for the parameter, and then store the parameters
+        #   in there.
+        # Is that slow? This is going to be a function that we call on every model
+        # evaluation.
+        return sfh_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params
+
 
     def get_model_lnu_hires(self, params, stepwise=False):
         '''Construct the high-resolution spectral model.
@@ -689,28 +744,30 @@ class Lightning:
         Nparams = param_shape[1]
 
         #assert (Nmodels == param_shape[0]), 'Number of SFHs must correspond to number of parameter sets for vectorization.'
-        assert (Nparams == self.Nparams), 'Number of provided parameters (%d) must match the total number of parameters expected by the model (%d). Check Lightning.print_params().' % (Nparams, self.Nparams)
+        #assert (Nparams == self.Nparams), 'Number of provided parameters (%d) must match the total number of parameters expected by the model (%d). Check Lightning.print_params().' % (Nparams, self.Nparams)
         #assert (Nsteps == self.Nages), 'Number of steps in provided SFHs must correpond to number of stellar ages in model.'
         #assert Nparams == 3
 
         # Chunk up parameter array -- eventually this ought to be a dict or something
-        sfh_params = params[:, 0:self.sfh.Nparams]
-        i = self.sfh.Nparams
-        if (self.atten is not None):
-            atten_params = params[:,i:i + self.atten.Nparams]
-            i += self.atten.Nparams
-        if (self.dust is not None):
-            dust_params = params[:,i:i + self.dust.Nparams]
-            i += self.dust.Nparams
-        if (self.agn is not None):
-            agn_params = params[:,i:i + self.agn.Nparams]
-            i += self.agn.Nparams
-        if (self.xray_stellar_em is not None):
-            st_xray_params = params[:,i:i + self.xray_stellar_em.Nparams]
-            i += self.xray_stellar_em.Nparams
-        if (self.xray_agn_em is not None):
-            agn_xray_params = params[:,i:i + self.xray_agn_em.Nparams]
-            i += self.xray_agn_em.Nparams
+        # sfh_params = params[:, 0:self.sfh.Nparams]
+        # i = self.sfh.Nparams
+        # if (self.atten is not None):
+        #     atten_params = params[:,i:i + self.atten.Nparams]
+        #     i += self.atten.Nparams
+        # if (self.dust is not None):
+        #     dust_params = params[:,i:i + self.dust.Nparams]
+        #     i += self.dust.Nparams
+        # if (self.agn is not None):
+        #     agn_params = params[:,i:i + self.agn.Nparams]
+        #     i += self.agn.Nparams
+        # if (self.xray_stellar_em is not None):
+        #     st_xray_params = params[:,i:i + self.xray_stellar_em.Nparams]
+        #     i += self.xray_stellar_em.Nparams
+        # if (self.xray_agn_em is not None):
+        #     agn_xray_params = params[:,i:i + self.xray_agn_em.Nparams]
+        #     i += self.xray_agn_em.Nparams
+
+        sfh_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = self._separate_params(params)
 
         # exptau = modified_calzetti(self.wave_grid_rest, params[:,0], params[:,1], np.zeros(Nmodels)) # ndarray(Nmodels, len(self.wave_grid_rest))
         # exptau_youngest = modified_calzetti(self.wave_grid_rest, params[:,0], params[:,1], params[:,2])
@@ -786,29 +843,31 @@ class Lightning:
         Nmodels = param_shape[0]
         Nparams = param_shape[1]
 
-        assert (Nparams == self.Nparams), 'Number of provided parameters (%d) must match the total number of parameters expected by the model (%d). Check Lightning.print_params().' % (Nparams, self.Nparams)
+        # assert (Nparams == self.Nparams), 'Number of provided parameters (%d) must match the total number of parameters expected by the model (%d). Check Lightning.print_params().' % (Nparams, self.Nparams)
+        #
+        # # Chunk up parameter array -- eventually this ought to be a dict or something
+        # sfh_params = params[:, 0:self.sfh.Nparams]
+        # i = self.sfh.Nparams
+        # if (self.atten is not None):
+        #     atten_params = params[:,i:i + self.atten.Nparams]
+        #     i += self.atten.Nparams
+        # if (self.dust is not None):
+        #     dust_params = params[:,i:i + self.dust.Nparams]
+        #     i += self.dust.Nparams
+        # if (self.agn is not None):
+        #     agn_params = params[:,i:i + self.agn.Nparams]
+        #     i += self.agn.Nparams
+        # if (self.xray_stellar_em is not None):
+        #     st_xray_params = params[:,i:i + self.xray_stellar_em.Nparams]
+        #     i += self.xray_stellar_em.Nparams
+        # if (self.xray_agn_em is not None):
+        #     agn_xray_params = params[:,i:i + self.xray_agn_em.Nparams]
+        #     i += self.xray_agn_em.Nparams
+        # if (self.xray_abs_intr is not None):
+        #     xray_abs_params = params[:,i:i + self.xray_abs_intr.Nparams]
+        #     i += self.xray_abs_intr.Nparams
 
-        # Chunk up parameter array -- eventually this ought to be a dict or something
-        sfh_params = params[:, 0:self.sfh.Nparams]
-        i = self.sfh.Nparams
-        if (self.atten is not None):
-            atten_params = params[:,i:i + self.atten.Nparams]
-            i += self.atten.Nparams
-        if (self.dust is not None):
-            dust_params = params[:,i:i + self.dust.Nparams]
-            i += self.dust.Nparams
-        if (self.agn is not None):
-            agn_params = params[:,i:i + self.agn.Nparams]
-            i += self.agn.Nparams
-        if (self.xray_stellar_em is not None):
-            st_xray_params = params[:,i:i + self.xray_stellar_em.Nparams]
-            i += self.xray_stellar_em.Nparams
-        if (self.xray_agn_em is not None):
-            agn_xray_params = params[:,i:i + self.xray_agn_em.Nparams]
-            i += self.xray_agn_em.Nparams
-        if (self.xray_abs_intr is not None):
-            xray_abs_params = params[:,i:i + self.xray_abs_intr.Nparams]
-            i += self.xray_abs_intr.Nparams
+        sfh_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = self._separate_params(params)
 
         # lnu_xray_intr = np.zeros((Nmodels, len(self.xray_wave_grid_rest)))
         # #lnu_xray_abs = np.zeros((Nmodels, len(self.xray_wave_grid_rest)))
@@ -902,32 +961,34 @@ class Lightning:
         Nmodels = param_shape[0]
         Nparams = param_shape[1]
 
-        assert (Nparams == self.Nparams), 'Number of provided parameters (%d) must match the total number of parameters expected by the model (%d). Check Lightning.print_params().' % (Nparams, self.Nparams)
-
-        # Chunk up parameter array -- eventually this ought to be a dict or something
-        sfh_params = params[:, 0:self.sfh.Nparams]
-        i = self.sfh.Nparams
-        if (self.atten is not None):
-            atten_params = params[:,i:i + self.atten.Nparams]
-            i += self.atten.Nparams
-        if (self.dust is not None):
-            dust_params = params[:,i:i + self.dust.Nparams]
-            i += self.dust.Nparams
-        if (self.agn is not None):
-            agn_params = params[:,i:i + self.agn.Nparams]
-            i += self.agn.Nparams
-        if (self.xray_stellar_em is not None):
-            st_xray_params = params[:,i:i + self.xray_stellar_em.Nparams]
-            i += self.xray_stellar_em.Nparams
-        if (self.xray_agn_em is not None):
-            agn_xray_params = params[:,i:i + self.xray_agn_em.Nparams]
-            i += self.xray_agn_em.Nparams
-        if (self.xray_abs_intr is not None):
-            xray_abs_params = params[:,i:i + self.xray_abs_intr.Nparams]
-            i += self.xray_abs_intr.Nparams
+        # assert (Nparams == self.Nparams), 'Number of provided parameters (%d) must match the total number of parameters expected by the model (%d). Check Lightning.print_params().' % (Nparams, self.Nparams)
+        #
+        # # Chunk up parameter array -- eventually this ought to be a dict or something
+        # sfh_params = params[:, 0:self.sfh.Nparams]
+        # i = self.sfh.Nparams
+        # if (self.atten is not None):
+        #     atten_params = params[:,i:i + self.atten.Nparams]
+        #     i += self.atten.Nparams
+        # if (self.dust is not None):
+        #     dust_params = params[:,i:i + self.dust.Nparams]
+        #     i += self.dust.Nparams
+        # if (self.agn is not None):
+        #     agn_params = params[:,i:i + self.agn.Nparams]
+        #     i += self.agn.Nparams
+        # if (self.xray_stellar_em is not None):
+        #     st_xray_params = params[:,i:i + self.xray_stellar_em.Nparams]
+        #     i += self.xray_stellar_em.Nparams
+        # if (self.xray_agn_em is not None):
+        #     agn_xray_params = params[:,i:i + self.xray_agn_em.Nparams]
+        #     i += self.xray_agn_em.Nparams
+        # if (self.xray_abs_intr is not None):
+        #     xray_abs_params = params[:,i:i + self.xray_abs_intr.Nparams]
+        #     i += self.xray_abs_intr.Nparams
 
         # exptau = modified_calzetti(self.wave_grid_rest, params[:,0], params[:,1], np.zeros(Nmodels)) # ndarray(Nmodels, len(self.wave_grid_rest))
         # exptau_youngest = modified_calzetti(self.wave_grid_rest, params[:,0], params[:,1], params[:,2])
+
+        sfh_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = self._separate_params(params)
 
         expminustau = self.atten.evaluate(atten_params)
 
@@ -1106,29 +1167,31 @@ class Lightning:
 
         #assert (Nmodels == param_shape[0]), 'Number of SFHs must correspond to number of parameter sets for vectorization.'
         #assert (Nages == self.Nages), 'Number of steps in provided SFHs must correpond to number of stellar ages in model.'
-        assert (Nparams == self.Nparams), 'Number of provided parameters (%d) must match the total number of parameters expected by the model (%d). Check Lightning.print_params().' % (Nparams, self.Nparams)
+        # assert (Nparams == self.Nparams), 'Number of provided parameters (%d) must match the total number of parameters expected by the model (%d). Check Lightning.print_params().' % (Nparams, self.Nparams)
+        #
+        # # Chunk up parameter array -- eventually this ought to be a dict or something
+        # sfh_params = params[:, 0:self.sfh.Nparams]
+        # i = self.sfh.Nparams
+        # if (self.atten is not None):
+        #     atten_params = params[:,i:i + self.atten.Nparams]
+        #     i += self.atten.Nparams
+        # if (self.dust is not None):
+        #     dust_params = params[:,i:i + self.dust.Nparams]
+        #     i += self.dust.Nparams
+        # if (self.agn is not None):
+        #     agn_params = params[:,i:i + self.agn.Nparams]
+        #     i += self.agn.Nparams
+        # if (self.xray_stellar_em is not None):
+        #     st_xray_params = params[:,i:i + self.xray_stellar_em.Nparams]
+        #     i += self.xray_stellar_em.Nparams
+        # if (self.xray_agn_em is not None):
+        #     agn_xray_params = params[:,i:i + self.xray_agn_em.Nparams]
+        #     i += self.xray_agn_em.Nparams
+        # if (self.xray_abs_intr is not None):
+        #     xray_abs_params = params[:,i:i + self.xray_abs_intr.Nparams]
+        #     i += self.xray_abs_intr.Nparams
 
-        # Chunk up parameter array -- eventually this ought to be a dict or something
-        sfh_params = params[:, 0:self.sfh.Nparams]
-        i = self.sfh.Nparams
-        if (self.atten is not None):
-            atten_params = params[:,i:i + self.atten.Nparams]
-            i += self.atten.Nparams
-        if (self.dust is not None):
-            dust_params = params[:,i:i + self.dust.Nparams]
-            i += self.dust.Nparams
-        if (self.agn is not None):
-            agn_params = params[:,i:i + self.agn.Nparams]
-            i += self.agn.Nparams
-        if (self.xray_stellar_em is not None):
-            st_xray_params = params[:,i:i + self.xray_stellar_em.Nparams]
-            i += self.xray_stellar_em.Nparams
-        if (self.xray_agn_em is not None):
-            agn_xray_params = params[:,i:i + self.xray_agn_em.Nparams]
-            i += self.xray_agn_em.Nparams
-        if (self.xray_abs_intr is not None):
-            xray_abs_params = params[:,i:i + self.xray_abs_intr.Nparams]
-            i += self.xray_abs_intr.Nparams
+        sfh_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = self._separate_params(params)
 
         lnu_xray_unabs = np.zeros((Nmodels, len(self.filter_labels)))
         lnu_xray_abs = np.zeros((Nmodels, len(self.filter_labels)))
@@ -1217,29 +1280,31 @@ class Lightning:
 
         #assert (Nmodels == param_shape[0]), 'Number of SFHs must correspond to number of parameter sets for vectorization.'
         #assert (Nages == self.Nages), 'Number of steps in provided SFHs must correpond to number of stellar ages in model.'
-        assert (Nparams == self.Nparams), 'Number of provided parameters (%d) must match the total number of parameters expected by the model (%d). Check Lightning.print_params().' % (Nparams, self.Nparams)
+        # assert (Nparams == self.Nparams), 'Number of provided parameters (%d) must match the total number of parameters expected by the model (%d). Check Lightning.print_params().' % (Nparams, self.Nparams)
+        #
+        # # Chunk up parameter array -- eventually this ought to be a dict or something
+        # sfh_params = params[:, 0:self.sfh.Nparams]
+        # i = self.sfh.Nparams
+        # if (self.atten is not None):
+        #     atten_params = params[:,i:i + self.atten.Nparams]
+        #     i += self.atten.Nparams
+        # if (self.dust is not None):
+        #     dust_params = params[:,i:i + self.dust.Nparams]
+        #     i += self.dust.Nparams
+        # if (self.agn is not None):
+        #     agn_params = params[:,i:i + self.agn.Nparams]
+        #     i += self.agn.Nparams
+        # if (self.xray_stellar_em is not None):
+        #     st_xray_params = params[:,i:i + self.xray_stellar_em.Nparams]
+        #     i += self.xray_stellar_em.Nparams
+        # if (self.xray_agn_em is not None):
+        #     agn_xray_params = params[:,i:i + self.xray_agn_em.Nparams]
+        #     i += self.xray_agn_em.Nparams
+        # if (self.xray_abs_intr is not None):
+        #     xray_abs_params = params[:,i:i + self.xray_abs_intr.Nparams]
+        #     i += self.xray_abs_intr.Nparams
 
-        # Chunk up parameter array -- eventually this ought to be a dict or something
-        sfh_params = params[:, 0:self.sfh.Nparams]
-        i = self.sfh.Nparams
-        if (self.atten is not None):
-            atten_params = params[:,i:i + self.atten.Nparams]
-            i += self.atten.Nparams
-        if (self.dust is not None):
-            dust_params = params[:,i:i + self.dust.Nparams]
-            i += self.dust.Nparams
-        if (self.agn is not None):
-            agn_params = params[:,i:i + self.agn.Nparams]
-            i += self.agn.Nparams
-        if (self.xray_stellar_em is not None):
-            st_xray_params = params[:,i:i + self.xray_stellar_em.Nparams]
-            i += self.xray_stellar_em.Nparams
-        if (self.xray_agn_em is not None):
-            agn_xray_params = params[:,i:i + self.xray_agn_em.Nparams]
-            i += self.xray_agn_em.Nparams
-        if (self.xray_abs_intr is not None):
-            xray_abs_params = params[:,i:i + self.xray_abs_intr.Nparams]
-            i += self.xray_abs_intr.Nparams
+        sfh_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = self._separate_params(params)
 
         #counts_xray_unabs = np.zeros((Nmodels, len(self.filter_labels)))
         counts_xray_abs = np.zeros((Nmodels, len(self.filter_labels)))
@@ -1475,49 +1540,51 @@ class Lightning:
 
         Nmodels = param_shape[0]
         Nparams = param_shape[1]
-        assert (Nparams == self.Nparams), 'Number of provided parameters (%d) must match the total number of parameters expected by the model (%d). Check Lightning.print_params().' % (Nparams, self.Nparams)
+        #assert (Nparams == self.Nparams), 'Number of provided parameters (%d) must match the total number of parameters expected by the model (%d). Check Lightning.print_params().' % (Nparams, self.Nparams)
 
         ob_mask = np.full((Nmodels, len(self.model_components)), False)
 
-        # Chunk up parameter array -- eventually this ought to be a dict or something
-        sfh_params = params[:, 0:self.sfh.Nparams]
-        i = self.sfh.Nparams
+        # # Chunk up parameter array -- eventually this ought to be a dict or something
+        # sfh_params = params[:, 0:self.sfh.Nparams]
+        # i = self.sfh.Nparams
+        #
+        # if (self.atten is not None):
+        #     atten_params = params[:,i:i + self.atten.Nparams]
+        #     i += self.atten.Nparams
+        # else:
+        #     atten_params = None
+        #
+        # if (self.dust is not None):
+        #     dust_params = params[:,i:i + self.dust.Nparams]
+        #     i += self.dust.Nparams
+        # else:
+        #     dust_params = None
+        #
+        # if (self.agn is not None):
+        #     agn_params = params[:,i:i + self.agn.Nparams]
+        #     i += self.agn.Nparams
+        # else:
+        #     agn_params = None
+        #
+        # if (self.xray_stellar_em is not None):
+        #     st_xray_params = params[:,i:i + self.xray_stellar_em.Nparams]
+        #     i += self.xray_stellar_em.Nparams
+        # else:
+        #     st_xray_params = None
+        #
+        # if (self.xray_agn_em is not None):
+        #     agn_xray_params = params[:,i:i + self.xray_agn_em.Nparams]
+        #     i += self.xray_agn_em.Nparams
+        # else:
+        #     agn_xray_params = None
+        #
+        # if (self.xray_abs_type not in ['None', None]):
+        #     xray_abs_params = params[:,i:i + self.xray_abs_intr.Nparams]
+        #     i += self.xray_abs_intr.Nparams
+        # else:
+        #     xray_abs_params = None
 
-        if (self.atten is not None):
-            atten_params = params[:,i:i + self.atten.Nparams]
-            i += self.atten.Nparams
-        else:
-            atten_params = None
-
-        if (self.dust is not None):
-            dust_params = params[:,i:i + self.dust.Nparams]
-            i += self.dust.Nparams
-        else:
-            dust_params = None
-
-        if (self.agn is not None):
-            agn_params = params[:,i:i + self.agn.Nparams]
-            i += self.agn.Nparams
-        else:
-            agn_params = None
-
-        if (self.xray_stellar_em is not None):
-            st_xray_params = params[:,i:i + self.xray_stellar_em.Nparams]
-            i += self.xray_stellar_em.Nparams
-        else:
-            st_xray_params = None
-
-        if (self.xray_agn_em is not None):
-            agn_xray_params = params[:,i:i + self.xray_agn_em.Nparams]
-            i += self.xray_agn_em.Nparams
-        else:
-            agn_xray_params = None
-
-        if (self.xray_abs_type not in ['None', None]):
-            xray_abs_params = params[:,i:i + self.xray_abs_intr.Nparams]
-            i += self.xray_abs_intr.Nparams
-        else:
-            xray_abs_params = None
+        sfh_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = self._separate_params(params)
 
         p = [sfh_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params]
 
@@ -1672,7 +1739,7 @@ class Lightning:
 
         return res
 
-    def get_mcmc_chains(self, sampler, thin=None, discard=None, flat=True, Nsamples=1000):
+    def get_mcmc_chains(self, sampler, thin=None, discard=None, flat=True, Nsamples=1000, const_dim=None, const_vals=None):
         '''Reduce the emcee sampler object into chains and an astropy Table object with basic information.
 
         Parameters
@@ -1691,6 +1758,12 @@ class Lightning:
             one chain per walker is retained (Default: True)
         Nsamples : int
             Number of posterior samples to retain after discarding/thinning/flattening (Default: 1000)
+        const_dim : np.array, boolean
+            An array of length Nparams showing which model parameters were constant (since emcee doesn't know
+            anything about these dimensions, we must provide them separately). If None,
+            these dimensions will be excluded from the output (as if there were no constant dimensions).
+        const_vals : np.array, float
+            An array giving the values of the constant model parameters, if any.
 
         Returns
         -------
@@ -1725,14 +1798,42 @@ class Lightning:
 
         samples = sampler.get_chain(thin=thin, discard=discard, flat=flat)
         logprob_samples = sampler.get_log_prob(thin=thin, discard=discard, flat=flat)
-        # try:
-        #     tnew = sampler.get_autocorr_time(discard=discard, thin=thin)
-        # except emcee.autocorr.AutocorrError:
-        #     print('WARNING: The re-calculated integrated autocorrelation time is longer than N/50.')
-        #     print('         The autocorrelation estimate may be unreliable.')
-        #     tnew = t
 
-        return samples[-1*Nsamples:,:], logprob_samples[-1*Nsamples:], t
+        # Catch case where number of samples in chain is smaller than Nsamples
+        Nleft = samples.shape[0]
+
+        if (const_dim is not None):
+
+            final_samples = np.zeros((Nsamples, self.Nparams))
+
+            assert (len(const_dim) == self.Nparams), "'const_dim' must have the same number of entries as model parameters."
+            assert (const_vals is not None), "If 'const_dim' is provided, 'const_vals' must also be provided."
+            assert (np.count_nonzero(const_dim) == len(const_vals)), "Number of 'const_vals' must correspond to number of constant parameters."
+
+            if (Nleft < Nsamples):
+                # Pad the chain with NaNs
+                final_samples += np.nan
+                final_samples[-1*Nleft:,~const_dim] = samples[:,:]
+                final_samples[-1*Nleft:,const_dim] = const_vals[None,:]
+
+                final_logprob_samples = np.nan + np.zeros((Nsamples, self.Nparams))
+                final_logprob_samples[-1*Nleft:] = logprob_samples[-1*Nsamples:]
+                return final_samples, final_logprob_samples, t
+            else:
+                final_samples[:,~const_dim] = samples[-1*Nsamples:,:]
+                final_samples[:,const_dim] = const_vals[None,:]
+                return final_samples, logprob_samples[-1*Nsamples:], t
+
+        else:
+
+            if (Nleft < Nsamples):
+                final_samples = np.nan + np.zeros((Nsamples, samples.shape[1]))
+                final_samples[-1*Nleft:,:] = samples
+                final_logprob_samples = np.nan + np.zeros(Nsamples)
+                final_logprob_samples[-1*Nleft:] = logprob_samples
+                return final_samples, final_logprob_samples, t
+            else:
+                return samples[-1*Nsamples:,:], logprob_samples[-1*Nsamples:], t
 
     def _to_dict(self):
         '''

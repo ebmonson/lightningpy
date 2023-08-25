@@ -15,6 +15,8 @@ from lightning import Lightning
 from lightning.priors import UniformPrior
 from lightning.plots import sed_plot_bestfit, sed_plot_delchi, chain_plot, corner_plot
 
+import h5py
+
 filter_labels = ['SDSS_u', 'SDSS_g', 'SDSS_r', 'SDSS_i', 'SDSS_z',
                  'IRAC_CH1', 'IRAC_CH2', 'IRAC_CH3', 'IRAC_CH4']
 
@@ -89,6 +91,9 @@ sampler = lgh.fit(p0,
                   priors=priors,
                   const_dim=const_dim)
 
+# There are no constant dimensions in this example, but if
+# we had any we would build them into the sample array
+# with the `const_dim` and `const_vals` keywords
 samples, logprob_samples, t = lgh.get_mcmc_chains(sampler)
 
 with open('toy_model_output.npy', 'wb') as f:
@@ -98,3 +103,8 @@ with open('toy_model_output.npy', 'wb') as f:
 
 lgh.save_json('toy_model_config.json')
 lgh.save_pickle('toy_model_lgh.pickle')
+
+with h5py.File('toy_model_ouput.hdf5', 'w') as f:
+    f.create_dataset('mcmc/samples', data=samples)
+    f.create_dataset('mcmc/logprob_samples', data=logprob_samples)
+    f.create_dataset('mcmc/autocorr', data=t)
