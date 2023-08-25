@@ -104,7 +104,7 @@ with open('toy_model_output.npy', 'wb') as f:
 lgh.save_json('toy_model_config.json')
 lgh.save_pickle('toy_model_lgh.pickle')
 
-with h5py.File('toy_model_ouput.hdf5', 'w') as f:
+with h5py.File('toy_model_output.hdf5', 'w') as f:
     f.create_dataset('mcmc/samples', data=samples)
     f.create_dataset('mcmc/logprob_samples', data=logprob_samples)
     f.create_dataset('mcmc/autocorr', data=t)
