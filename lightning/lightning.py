@@ -1612,6 +1612,7 @@ class Lightning:
             else:
                 return samples[-1*Nsamples:,:], logprob_samples[-1*Nsamples:], t
 
+    ## MODEL SERIALIZATION
     def _to_dict(self):
         '''
         Create a dict containing the minimal information needed
@@ -1736,3 +1737,34 @@ class Lightning:
         with open(fname, 'wb') as f:
 
             pickle.dump(self, f)
+
+    ## PLOTS
+    def chain_plot(self, samples, **kwargs):
+        # At some point, google whether the renaming here is necessary
+        from lightning.plots import chain_plot as f
+
+        return f(self, samples, **kwargs)
+
+    def corner_plot(self, samples, **kwargs):
+
+        from lightning.plots import corner_plot as f
+
+        return f(self, samples, **kwargs)
+
+    def sed_plot_bestfit(self, samples, logprob_samples, **kwargs):
+
+        from lightning.plots import sed_plot_bestfit as f
+
+        return f(self, samples, logprob_samples, **kwargs)
+
+    def sed_plot_delchi(self, samples, logprob_samples, **kwargs):
+
+        from lightning.plots import sed_plot_delchi as f
+
+        return f(self, samples, logprob_samples, **kwargs)
+
+    def sfh_plot(self, samples, **kwargs):
+
+        from lightning.plots import sfh_plot as f
+
+        return f(self, samples, **kwargs)
