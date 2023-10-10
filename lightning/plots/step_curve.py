@@ -66,7 +66,7 @@ def step_curve(bin_edges, y_values, anchor=False):
         anchor_out_x_values[-1] = bin_edges[-1]
         anchor_out_y_values[:,0] = 0.0
         anchor_out_y_values[:,-1] = 0.0
-        anchor_out_x_values[:,1:-1] = out_x_values
+        anchor_out_x_values[1:-1] = out_x_values
         anchor_out_y_values[:,1:-1] = out_y_values
         if Ncurves == 1: anchor_out_y_values = anchor_out_y_values.flatten()
         return anchor_out_x_values, anchor_out_y_values
