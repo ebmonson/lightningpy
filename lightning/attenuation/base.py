@@ -70,6 +70,39 @@ class AnalyticAtten:
 
         return expminustau
 
+    def print_params(self, verbose=False):
+
+        '''
+            If `verbose`, print a nicely formatted table
+            of the models, their parameters, and the description
+            of the parameters.
+            Otherwise, just print the names of the parameters.
+        '''
+
+        if (verbose):
+
+            from astropy.table import Table
+            from astropy.io import ascii
+
+            print('')
+            print('============================')
+            print(self.model_name)
+            print('============================')
+            mod_table = Table()
+            mod_table['Parameter'] = self.param_names
+            mod_table['Lo'] = self.param_bounds[:,0]
+            mod_table['Hi'] = self.param_bounds[:,1]
+            mod_table['Description'] = self.param_descr
+            #print(mod_table)
+            ascii.write(mod_table, format='fixed_width_two_line')
+
+        else:
+
+            print(self.param_names)
+
+        print('')
+        print('Total parameters: %d' % (self.Nparams))
+
 class TabulatedAtten:
     '''
 Base class for tabulated attenuation curves.
@@ -162,3 +195,36 @@ Base class for tabulated attenuation curves.
             expminustau = expminustau.flatten()
 
         return expminustau
+
+    def print_params(self, verbose=False):
+
+        '''
+            If `verbose`, print a nicely formatted table
+            of the models, their parameters, and the description
+            of the parameters.
+            Otherwise, just print the names of the parameters.
+        '''
+
+        if (verbose):
+
+            from astropy.table import Table
+            from astropy.io import ascii
+
+            print('')
+            print('============================')
+            print(self.model_name)
+            print('============================')
+            mod_table = Table()
+            mod_table['Parameter'] = self.param_names
+            mod_table['Lo'] = self.param_bounds[:,0]
+            mod_table['Hi'] = self.param_bounds[:,1]
+            mod_table['Description'] = self.param_descr
+            #print(mod_table)
+            ascii.write(mod_table, format='fixed_width_two_line')
+
+        else:
+
+            print(self.param_names)
+
+        print('')
+        print('Total parameters: %d' % (self.Nparams))
