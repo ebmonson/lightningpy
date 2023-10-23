@@ -66,7 +66,7 @@ class DL07Dust(BaseEmissionModel):
                              [0.0, 1.0],
                              [0.0047, 0.0458]])
 
-    def _construct_model(self):
+    def _construct_model(self, wave_grid=None):
         '''
             Load the models from various files.
         '''
@@ -84,10 +84,14 @@ class DL07Dust(BaseEmissionModel):
         n_U = len(self._U_grid)
         n_mod = len(self._mod_grid)
 
-        self.Lnu_rest = np.zeros((n_U, n_mod, 1001), dtype='double')
-        self.Lbol = np.zeros((n_U, n_mod), dtype='double')
-
         c_um = const.c.to(u.micron / u.s).value
+
+        if (wave_grid is not None):
+            self.Lnu_rest = np.zeros((n_U, n_mod, len(wave_grid)), dtype='double')
+            nu_grid = c_um / wave_grid
+        else:
+            self.Lnu_rest = np.zeros((n_U, n_mod, 1001), dtype='double')
+        self.Lbol = np.zeros((n_U, n_mod), dtype='double')
 
         for i,U in enumerate(self._U_grid):
             for j,mod in enumerate(self._mod_grid):
@@ -97,16 +101,29 @@ class DL07Dust(BaseEmissionModel):
                 model_arr = np.loadtxt(fname, usecols=(0,1), skiprows=61)
 
                 # Model files are in order of decreasing wavelenth/increasing nu
-                nu = c_um / model_arr[:,0]
+                nu_src = c_um / model_arr[:,0]
 
-                self.Lnu_rest[i,j,:] = model_arr[:,1][::-1] / nu[::-1]
-                nu = nu[::-1]
+                lnu_src = model_arr[:,1][::-1] / nu_src[::-1]
+                nu_src = nu_src[::-1]
+
+                if (wave_grid is not None):
+                    finterp = interp1d(nu_src, lnu_src, bounds_error=False, fill_value=0)
+                    lnu_interp = finterp(nu_grid)
+
+                    self.Lnu_rest[i,j,:] = lnu_interp
+                    nu = nu_grid
+                else:
+                    self.Lnu_rest[i,j,:] = lnu_src
+                    nu = nu_src
 
                 self.Lbol[i,j] = np.abs(trapz(self.Lnu_rest[i,j,:], nu))
 
         self.nu_grid_rest = nu
         self.nu_grid_obs = (1 + self.redshift) * self.nu_grid_rest
-        self.wave_grid_rest = model_arr[:,0][::-1]
+        if (wave_grid is not None):
+            self.wave_grid_rest = wave_grid
+        else:
+            self.wave_grid_rest = model_arr[:,0][::-1]
         self.wave_grid_obs = (1 + self.redshift) * self.wave_grid_rest
         self.Lnu_obs = (1 + self.redshift) * self.Lnu_rest
 
@@ -202,6 +219,77 @@ class DL07Dust(BaseEmissionModel):
         return Lnu_obs, Lbol
 
 
+    # def get_model_lnu(self, params):
+    #     '''Construct the dust SED as observed in the given filters.
+    #
+    #     Given a set of parameters, the corresponding high-resolution spectrum
+    #     is constructed and convolved with the filters.
+    #
+    #     Parameters
+    #     ----------
+    #     params : np.ndarray, (Nmodels, 5) or (5,) float32
+    #         The dust model parameters.
+    #
+    #     Returns
+    #     -------
+    #     Lnu_obs : np.ndarray, (Nmodels, Nfilters), (Nmodels, Nages, Nfilters), or (Nfilters,), float32
+    #         The dust spectrum as seen through the given filters
+    #     Lbol : np.ndarray, (Nmodels,) or (Nmodels, Nages)
+    #         The total luminosity of the dust model.
+    #
+    #     '''
+    #
+    #     param_shape = params.shape # expecting ndarray(Nmodels, Nparams)
+    #     if (len(param_shape) == 1):
+    #         params = params.reshape(1, params.size)
+    #         param_shape = params.shape
+    #
+    #
+    #     Nmodels = param_shape[0]
+    #     Nparams_in = param_shape[1]
+    #
+    #     assert (self.Nparams == Nparams_in), 'The dust model has 5 parameters'
+    #
+    #     ob = self._check_bounds(params)
+    #     if(np.any(ob)):
+    #         raise ValueError('Given parameters are out of bounds for this model (%s).' % (self.model_name))
+    #
+    #     #Lbol = np.zeros(Nmodels, len(self._U_grid))
+    #     #Lnu = np.zeros(Nmodels, self.Nfilters, len(self._U_grid))
+    #
+    #     finterp_Lbol_qPAH = interp1d(self._qPAH_grid, self.Lbol, axis=1)
+    #     Lbol = finterp_Lbol_qPAH(params[:,4]) # ndarray(len(self._U_grid), Nmodels)
+    #     finterp_Lnu_qPAH = interp1d(self._qPAH_grid, self.mean_Lnu, axis=1)
+    #     Lnu = finterp_Lnu_qPAH(params[:,4]) # ndarray(len(self._U_grid), Nmodels, Nfilters)
+    #
+    #     # Power law component U^(-alpha)
+    #     U_float = np.array(self._U_grid, dtype='float')
+    #     plaw = U_float[:,None] ** (-1 * params[:,0]) # ndarray(len(self._U_grid), Nmodels)
+    #     # For each model, zero out power law outside of [U_min, U_max]
+    #     mask = (U_float[:,None] < params[:,1]) | (U_float[:,None] > params[:,2])
+    #     plaw[mask] = 0
+    #     plaw = plaw / trapz(plaw, U_float, axis=0) # Normalize
+    #
+    #     Lbol_pow = params[:,3] * trapz(plaw * Lbol, U_float, axis=0)
+    #     Lnu_pow = params[:,3][:,None] * trapz(plaw[:,:,None] * Lnu, U_float, axis=0)
+    #
+    #     # Delta function component U_max = U_min
+    #     Lbol_delta = np.zeros(Nmodels)
+    #     Lnu_delta = np.zeros((Nmodels, self.Nfilters))
+    #     # Should be able to do this without the loop but I haven't figured out the correct index trickery
+    #     for i in np.arange(Nmodels):
+    #         finterp_Lbol_U = interp1d(U_float, Lbol[:,i], axis=0)
+    #         #Lbol_delta = (1 - params[:,3]) * finterp_Lbol_U(params[:,1]) # ndarray(Nmodels)
+    #         Lbol_delta[i] = finterp_Lbol_U(params[i,1]) # ndarray(Nmodels)
+    #         finterp_Lnu_U = interp1d(U_float, Lnu[:,i,:], axis=0)
+    #         # Lnu_delta = (1 - params[:,3])[:,None] * finterp_Lnu_U(params[:,1])
+    #         Lnu_delta[i,:] = finterp_Lnu_U(params[i,1])
+    #
+    #     Lnu_obs = Lnu_pow + Lnu_delta
+    #     Lbol = Lbol_pow + Lbol_delta
+    #
+    #     return Lnu_obs, Lbol
+
     def get_model_lnu(self, params):
         '''Construct the dust SED as observed in the given filters.
 
@@ -237,38 +325,16 @@ class DL07Dust(BaseEmissionModel):
         if(np.any(ob)):
             raise ValueError('Given parameters are out of bounds for this model (%s).' % (self.model_name))
 
-        #Lbol = np.zeros(Nmodels, len(self._U_grid))
-        #Lnu = np.zeros(Nmodels, self.Nfilters, len(self._U_grid))
+        lnu_hires, lbol = self.get_model_lnu_hires(params)
 
-        finterp_Lbol_qPAH = interp1d(self._qPAH_grid, self.Lbol, axis=1)
-        Lbol = finterp_Lbol_qPAH(params[:,4]) # ndarray(len(self._U_grid), Nmodels)
-        finterp_Lnu_qPAH = interp1d(self._qPAH_grid, self.mean_Lnu, axis=1)
-        Lnu = finterp_Lnu_qPAH(params[:,4]) # ndarray(len(self._U_grid), Nmodels, Nfilters)
+        if (Nmodels == 1):
+            lnu_hires = lnu_hires.reshape(1,-1)
 
-        # Power law component U^(-alpha)
-        U_float = np.array(self._U_grid, dtype='float')
-        plaw = U_float[:,None] ** (-1 * params[:,0]) # ndarray(len(self._U_grid), Nmodels)
-        # For each model, zero out power law outside of [U_min, U_max]
-        mask = (U_float[:,None] < params[:,1]) | (U_float[:,None] > params[:,2])
-        plaw[mask] = 0
-        plaw = plaw / trapz(plaw, U_float, axis=0) # Normalize
+        lmod = np.zeros((Nmodels, self.Nfilters))
 
-        Lbol_pow = params[:,3] * trapz(plaw * Lbol, U_float, axis=0)
-        Lnu_pow = params[:,3][:,None] * trapz(plaw[:,:,None] * Lnu, U_float, axis=0)
+        for i, filter_label in enumerate(self.filters):
+            # Recall that the filters are normalized to 1 when integrated against wave_grid_obs
+            # so we can integrate with that to get the mean Lnu in each band.
+            lmod[:,i] = trapz(self.filters[filter_label][None,:] * lnu_hires, self.wave_grid_obs, axis=1)
 
-        # Delta function component U_max = U_min
-        Lbol_delta = np.zeros(Nmodels)
-        Lnu_delta = np.zeros((Nmodels, self.Nfilters))
-        # Should be able to do this without the loop but I haven't figured out the correct index trickery
-        for i in np.arange(Nmodels):
-            finterp_Lbol_U = interp1d(U_float, Lbol[:,i], axis=0)
-            #Lbol_delta = (1 - params[:,3]) * finterp_Lbol_U(params[:,1]) # ndarray(Nmodels)
-            Lbol_delta[i] = finterp_Lbol_U(params[i,1]) # ndarray(Nmodels)
-            finterp_Lnu_U = interp1d(U_float, Lnu[:,i,:], axis=0)
-            # Lnu_delta = (1 - params[:,3])[:,None] * finterp_Lnu_U(params[:,1])
-            Lnu_delta[i,:] = finterp_Lnu_U(params[i,1])
-
-        Lnu_obs = Lnu_pow + Lnu_delta
-        Lbol = Lbol_pow + Lbol_delta
-
-        return Lnu_obs, Lbol
+        return lmod, lbol

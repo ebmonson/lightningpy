@@ -562,7 +562,7 @@ class Lightning:
         Initialize dust emission model.
         '''
 
-        self.dust = DustModel(self.filter_labels, self.redshift)
+        self.dust = DustModel(self.filter_labels, self.redshift, wave_grid=self.wave_grid_rest)
 
     def _setup_agn(self):
         '''
