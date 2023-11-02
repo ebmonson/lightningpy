@@ -1458,55 +1458,145 @@ class Lightning:
         return sampler
 
 
-    def _fit_simplex(self, p0, **kwargs):
+    # def _fit_simplex(self, p0, **kwargs):
+    #     '''
+    #     Helper function to fit with a minimizer.
+    #     '''
+    #
+    #     from scipy.optimize import minimize
+    #
+    #     N_dim = self.Nsteps + 3
+    #
+    #     try:
+    #         const_dim = kwargs['const_dim']
+    #         const_dim = np.array(const_dim)
+    #         var_dim = np.logical_not(const_dim)
+    #         N_const_dim = np.count_nonzero(const_dim)
+    #     except:
+    #         const_dim = np.zeros(N_dim, dtype='bool')
+    #         var_dim = np.logical_not(const_dim)
+    #         N_const_dim = 0
+    #     # end try
+    #
+    #     if (const_dim is not None):
+    #         const_vals = p0[const_dim]
+    #         def log_prob_func(x):
+    #             Nmodels = x.shape[0]  # in the first iteration emcee samples the initial log prob for every walker at once;
+    #             xx = np.zeros(N_dim) # in subsequent iterations, it does teams of N_walkers/2
+    #             xx[var_dim] = x
+    #             xx[const_dim] = const_vals
+    #             return self.get_model_log_prob(xx[:self.Nsteps], xx[self.Nsteps:], negative=True, p_bound=1e6)
+    #
+    #     else:
+    #         def log_prob_func(x):
+    #             return self.get_model_log_prob(x[:self.Nsteps], x[self.Nsteps:], negative=True, p_bound=1e6)
+    #
+    #     res = minimize(log_prob_func, p0[var_dim], method='CG',
+    #                    options={'disp': True, 'norm' : 2,
+    #                             'maxiter': (N_dim - N_const_dim) * 500})
+    #
+    #     return res
+
+    def _fit_LBFGSB(self, p0, disp=False, maxiter=None,
+                    MCMC_followup=False, MCMC_kwargs={'Nwalkers':64,'Nsteps':1000,'progress':True, 'init_scale':1e-3},
+                    **kwargs):
+        '''Helper function to fit with the L-BFGS-B algorithm.
+
+        The L-BFGS-B algorithm is a good general-use choice for minimization, and allows the use of box bounds. Here we also
+        add the option for an `MCMC_followup` -- rather than computing uncertainties by brute force (calculating dchi2
+        on a grid in the vicinity of the solution) or by naive Monte Carlo (perturbing the photometry and refitting
+        ~100 times to observe the spread of the solutions), we explore the region around the solution with emcee. This
+        is fairly time-efficient.
+
+        Parameters
+        ----------
+        p0 : np.ndarray, (Nparams,)
+            Initial point for the minimization algorithm.
+        disp : bool
+            If `True`, print the output from scipy.optimize.minimize.
+        maxiter : int
+            Maximum number of iterations for the minimizer. By default, this is 500 times the number of parameters.
+        MCMC_followup : bool
+            If `True`, perform the MCMC followup briefly described above.
+        MCMC_kwargs : dict
+            Keywords passed through to Lightning.fit(method='emcee'), i.e. `Nwalkers` and `Nsteps`. The keyword
+            `init_scale` is not passed through (yet, I'll probably change that), and is just used to initialize the MCMC
+            ensemble in a Gaussian ball around the BFGS solution.
+        bounds : list of tuple
+            Each element of this list should be a tuple giving the lower and upper bounds on the corresponding parameter.
+            For constant parameters, set the lower bound and upper bound equal to each other. To use the default (widest)
+            bounds for the given parameter, replace the tuple with `None`.
         '''
-        Helper function to fit with a minimizer.
-        '''
 
-        from scipy.optimize import minimize
+        from scipy.optimize import minimize, Bounds
 
-        N_dim = self.Nsteps + 3
+        Ndim = self.Nparams
+        bounds = kwargs['bounds']
+        if maxiter is None:
+            maxiter = Ndim * 500
 
-        try:
-            const_dim = kwargs['const_dim']
-            const_dim = np.array(const_dim)
-            var_dim = np.logical_not(const_dim)
-            N_const_dim = np.count_nonzero(const_dim)
-        except:
-            const_dim = np.zeros(N_dim, dtype='bool')
-            var_dim = np.logical_not(const_dim)
-            N_const_dim = 0
-        # end try
+        # If:
+        # - bounds are given, use those
+        # - bounds are given as None, use the widest allowed bounds
+        # - parameter i is meant to be constant, the bounds are [ p0[i], p0[i] ]
 
-        if (const_dim is not None):
-            const_vals = p0[const_dim]
-            def log_prob_func(x):
-                Nmodels = x.shape[0]  # in the first iteration emcee samples the initial log prob for every walker at once;
-                xx = np.zeros(N_dim) # in subsequent iterations, it does teams of N_walkers/2
-                xx[var_dim] = x
-                xx[const_dim] = const_vals
-                return self.get_model_log_prob(xx[:self.Nsteps], xx[self.Nsteps:], negative=True, p_bound=1e6)
+        default_mask = np.array([b is None for b in bounds])
+        if np.count_nonzero(default_mask) > 0:
+            # Look up the default bounds for the corresponding parameter
+            default_bounds = np.zeros((self.Nparams, 2))
 
+            start = 0
+            for i in np.arange(len(self.model_components)):
+                mod = self.model_components[i]
+                if mod is not None:
+                    end = start + mod.Nparams
+                    param_bounds = mod.param_bounds
+                    default_bounds[start:end, :] = param_bounds
+                    start = end
+
+
+            bounds_tmp = np.array([b if b is not None else (0,0) for b in bounds])
+            fullbounds = Bounds(np.where(default_mask, default_bounds[:,0], bounds_tmp[:,0]),
+                                np.where(default_mask, default_bounds[:,1], bounds_tmp[:,1]))
         else:
-            def log_prob_func(x):
-                return self.get_model_log_prob(x[:self.Nsteps], x[self.Nsteps:], negative=True, p_bound=1e6)
+            bounds_tmp = np.array(bounds)
+            fullbounds = Bounds(bounds_tmp[:,0],
+                                bounds_tmp[:,1])
 
-        res = minimize(log_prob_func, p0[var_dim], method='CG',
-                       options={'disp': True, 'norm' : 2,
-                                'maxiter': (N_dim - N_const_dim) * 500})
+        # Use -1 * loglike as the objective function.
+        def objfunc(x):
+            logL = self.get_model_likelihood(x, negative=True)
+            return logL
 
-        return res
+        res = minimize(objfunc, p0, method='L-BFGS-B',
+                       bounds=fullbounds,
+                       options={'disp': disp,
+                                'maxiter': maxiter})
 
+        if (res.success and MCMC_followup):
+            from lightning.priors import UniformPrior
+            import emcee
+            rng = np.random.default_rng()
+            mcmc_p0 = res.x[None,:] + rng.normal(loc=0, scale=MCMC_kwargs['init_scale'], size=(MCMC_kwargs['Nwalkers'], len(res.x)))
+            priors = [UniformPrior(b) if (b[1] - b[0]) != 0 else None for b in zip(fullbounds.lb, fullbounds.ub)]
+            const_dim = np.array([pr is None for pr in priors])
+            mcmc_p0[:,const_dim] = res.x[const_dim]
+            mcmc = self.fit(mcmc_p0, method='emcee', Nwalkers=MCMC_kwargs['Nwalkers'], Nsteps=MCMC_kwargs['Nsteps'],
+                            priors=priors, const_dim=const_dim)
+
+            return res, mcmc
+        else:
+            return res
 
     def fit(self, p0, **kwargs):
         '''Fit the model to the data.
 
         Parameters
         ----------
-        p0 : np.ndarray, (Nwalkers, Nparam), float32
+        p0 : np.ndarray, (Nwalkers, Nparam) or (Nparam,), float32
             Initial parameters. In the case of the affine invariant MCMC
             sampler, this should be a 2D array initializing the entire ensemble.
-        method : {'emcee', 'simplex'}
+        method : {'emcee', 'optimize'}
             Fitting method.
 
         Returns
@@ -1523,8 +1613,10 @@ class Lightning:
 
         if(method == 'emcee'):
             res = self._fit_emcee(p0, **kwargs)
-        elif(method == 'simplex'):
-            res = self._fit_simplex(p0, **kwargs)
+        # elif(method == 'simplex'):
+        #     res = self._fit_simplex(p0, **kwargs)
+        elif(method == 'optimize'):
+            res = self._fit_LBFGSB(p0, **kwargs)
         else:
             ValueError('Fitting method "%s" not recognized.' % (method))
 
@@ -1654,7 +1746,7 @@ class Lightning:
         else:
             arf_tmp = None
 
-        dict = {'filter_labels': self.filter_labels,
+        dict = {'filter_labels': list(self.filter_labels),
                 'redshift': redshift_tmp,
                 'lum_dist': DL_tmp,
                 'flux_obs': self._flux_obs.tolist(),

@@ -11,85 +11,11 @@ from lightning.ppc import ppc
 
 import h5py
 
-def postprocess_catalog(chain_filenames,
-                        model_filenames,
-                        model_mode='json',
-                        names=None,
-                        catalog_name='postprocessed_catalog.hdf5'):
-    '''Given lists of chain files and model files, merge the results into a postprocessed catalog.
-
-    This postprocessing script is for *samplers*, not for maximum likelihood methods. Luckily
-    I haven't fully implemented any of the maximum likelihood methods yet.
-
-    This script uses h5py to produce an output file in HDF5 format. I've made this choice to allow for
-    non-homogeneous model setups, e.g. different numbers of bandpasses and parameters per source.
-    The structure and content of the HDF5 file is as follows (for each source):
-
-    └──sourcename
-        ├── mcmc
-        │   ├── logprob_samples (Nsamples)
-        │   └── samples (Nsamples, Nparams)
-        ├── parameters
-        │   ├── modelname
-        │   │   └── parametername
-        │   │       ├── best ()
-        │   │       ├── hi ()
-        │   │       ├── lo ()
-        │   │       └── med ()
-        └── properties
-            ├── filter_labels (Nfilters)
-            ├── lnu (Nfilters)
-            ├── lnu_unc (Nfilters)
-            ├── lumdist ()
-            ├── mstar
-            │   ├── best ()
-            │   ├── hi ()
-            │   ├── lo ()
-            │   └── med ()
-            ├── redshift ()
-            └── pvalue ()
-
-    The "modelname" and "parametername" groups under the "parameters" group repeat for every model
-    and parameter. For piecewise-constant SFHs the "properties" group also contains the age bin edges
-    for the SFH. Quantiles ("*/lo" and "*/hi") are computed at the 16 and 84th percentile.
-
-    The chains are also expected to be in HDF5 format, with the following structure:
-
-    mcmc
-    ├── logprob_samples (Nsamples)
-    ├── samples (Nsamples, Nparams)
-    └── autocorr (Nparams)
-
-    I'll provide a function to make such HDF5 chain files soon if I haven't already.
-
-
-    Parameters
-    ----------
-    chain_filenames : array-like, str
-        A list of filenames pointing to the chain files.
-    model_filenames : array-like, str
-        A list of filenames poitning to the model files (either json or pickles).
-    model_mode : str
-        Method for model serialization, either "json" or "pickle". (Default: "json")
-    names : array-like, str
-        Names for each of the galaxies. If None (default), we'll just guess
-        based on the filenames of the chains assuming that they're named something like
-        [NAME]_chain.npy.
-    catalog_name : str
-        Default: "postprocessed_catalog.hdf5"
-
-    Returns
-    -------
-    Nothing.
-
-    Notes
-    -----
-    TODO:
-    - Allow user-supplied quantiles.
-    - Add additional properties; allow user specification of properties? That might be a whole
-      chore.
-
-    '''
+def postprocess_catalog_mcmc(chain_filenames,
+                             model_filenames,
+                             model_mode='json',
+                             names=None,
+                             catalog_name='postprocessed_catalog.hdf5'):
 
     assert (len(chain_filenames) == len(model_filenames)), "We require the same number of chain and model filenames."
     if names is not None:
@@ -214,6 +140,199 @@ def postprocess_catalog(chain_filenames,
 
             properties.create_dataset('pvalue', data=pvalue)
 
+def postprocess_catalog_mle(res_filenames,
+                            model_filenames,
+                            model_mode='json',
+                            names=None,
+                            catalog_name='postprocessed_catalog.hdf5'):
+    assert (len(res_filenames) == len(model_filenames)), "We require the same number of result and model filenames."
+    if names is not None:
+        assert (len(names) == len(res_filenames)), "We require the same number of source names as results."
+    else:
+        # Assume that anything before the first underscore in the chain files is the name
+        names = [path.splitext(path.basename(s))[0].split('_')[0] for s in res_filenames]
+
+    assert (model_mode in ['json', 'pickle']), "'model_mode' must be either 'json' or 'pickle'."
+
+    with h5py.File(catalog_name, 'w') as outfile:
+
+        for i, cf, mf, n in tqdm(zip(np.arange(len(res_filenames)), res_filenames, model_filenames, names), total=len(res_filenames)):
+
+            with h5py.File(cf, 'r') as f:
+
+                # Writing to in-memory arrays so that samples and logprob_samples don't go
+                # out of scope when the file closes. This is probably silly, and contrary to
+                # the whole point of HDF5. Could just bump everything under the above context
+                # instead.
+                bestfit = np.zeros(f['res/bestfit'].shape)
+                f['res/bestfit'].read_direct(bestfit)
+                chi2_best = np.zeros(f['res/chi2_best'].shape)
+                f['res/chi2_best'].read_direct(chi2_best)
+
+            source = outfile.create_group(n)
+
+            source.create_dataset('res/bestfit', data=bestfit)
+            source.create_dataset('res/chi2_best', data=chi2_best)
+
+            if (model_mode == 'json'):
+                lgh = Lightning.from_json(mf)
+            elif (model_mode == 'pickle'):
+                with open(mf, 'rb') as f:
+                    lgh = pickle.load(f)
+
+            ##### PARAMETERS
+            sfh_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = lgh._separate_params(bestfit)
+            parameters = source.create_group('parameters')
+            if (sfh_params is not None):
+                for j,pname in enumerate(lgh.sfh.param_names):
+                    parameters.create_dataset('sfh/%s/best' % (pname), data=sfh_params)
+            if (atten_params is not None):
+                for j,pname in enumerate(lgh.atten.param_names):
+                    parameters.create_dataset('atten/%s/best' % (pname), data=atten_params)
+            if (dust_params is not None):
+                for j,pname in enumerate(lgh.dust.param_names):
+                    parameters.create_dataset('dust/%s/best' % (pname), data=dust_params)
+            if (agn_params is not None):
+                for j,pname in enumerate(lgh.agn.param_names):
+                    parameters.create_dataset('agn/%s/best' % (pname), data=agn_params)
+            if (st_xray_params is not None):
+                for j,pname in enumerate(lgh.xray_st_em.param_names):
+                    parameters.create_dataset('xray_stellar/%s/best' % (pname), data=st_xray_params)
+            if (agn_xray_params is not None):
+                for j,pname in enumerate(lgh.xray_agn_em.param_names):
+                    parameters.create_dataset('xray_agn/%s/best' % (pname), data=agn_xray_params)
+            if (xray_abs_params is not None):
+                for j,pname in enumerate(lgh.xray_abs_intr.param_names):
+                    parameters.create_dataset('xray_abs/%s/best' % (pname), data=xray_abs_params)
+
+            ##### PROPERTIES
+            properties = source.create_group('properties')
+            if (lgh.sfh.type == 'piecewise'):
+                mstar = lgh.sfh.sum(sfh_params, lgh.stars.mstar)
+            else:
+                mstar = lgh.sfh.integrate(sfh_params, lgh.stars.mstar)
+
+            #mstar_q = np.nanquantile(mstar, q=(0.16, 0.50, 0.84))
+
+            properties.create_dataset('redshift', data=lgh.redshift)
+            properties.create_dataset('lumdist', data=lgh.DL)
+            properties.create_dataset('filter_labels', data=lgh.filter_labels)
+            properties.create_dataset('lnu', data=lgh.Lnu_obs)
+            properties.create_dataset('lnu_unc', data=lgh.Lnu_unc)
+            if (lgh.sfh.type == 'piecewise'):
+                properties.create_dataset('steps_bounds', data=lgh.ages)
+
+            properties.create_dataset('mstar/best', data=mstar)
+
+            #pvalue,_,_ = ppc(lgh, samples, logprob_samples)
+
+            #properties.create_dataset('pvalue', data=pvalue)
+
+
+def postprocess_catalog(res_filenames,
+                        model_filenames,
+                        solver_mode='mcmc',
+                        model_mode='json',
+                        names=None,
+                        catalog_name='postprocessed_catalog.hdf5'):
+    '''Given lists of chain files and model files, merge the results into a postprocessed catalog.
+
+    This postprocessing script is for *samplers*, not for maximum likelihood methods. Luckily
+    I haven't fully implemented any of the maximum likelihood methods yet.
+
+    This script uses h5py to produce an output file in HDF5 format. I've made this choice to allow for
+    non-homogeneous model setups, e.g. different numbers of bandpasses and parameters per source.
+    The structure and content of the HDF5 file is as follows (for each source):
+
+    └──sourcename
+        ├── mcmc
+        │   ├── logprob_samples (Nsamples)
+        │   └── samples (Nsamples, Nparams)
+        ├── parameters
+        │   ├── modelname
+        │   │   └── parametername
+        │   │       ├── best ()
+        │   │       ├── hi ()
+        │   │       ├── lo ()
+        │   │       └── med ()
+        └── properties
+            ├── filter_labels (Nfilters)
+            ├── lnu (Nfilters)
+            ├── lnu_unc (Nfilters)
+            ├── lumdist ()
+            ├── mstar
+            │   ├── best ()
+            │   ├── hi ()
+            │   ├── lo ()
+            │   └── med ()
+            ├── redshift ()
+            └── pvalue ()
+
+    The "modelname" and "parametername" groups under the "parameters" group repeat for every model
+    and parameter. For piecewise-constant SFHs the "properties" group also contains the age bin edges
+    for the SFH. Quantiles ("*/lo" and "*/hi") are computed at the 16 and 84th percentile.
+
+    For solver_mode='mcmc', the chains are also expected to be in HDF5 format, with the following structure:
+
+    mcmc
+    ├── logprob_samples (Nsamples)
+    ├── samples (Nsamples, Nparams)
+    └── autocorr (Nparams)
+
+    Whereas for solver_mode='mle', the results are expected to be formated as:
+
+    res
+    ├── bestfit (Nparams)
+    └── chi2_best ()
+
+
+    I'll provide a function to make such HDF5 result files soon if I haven't already.
+
+
+    Parameters
+    ----------
+    res_filenames : array-like, str
+        A list of filenames pointing to the result files.
+    model_filenames : array-like, str
+        A list of filenames poitning to the model files (either json or pickles).
+    model_mode : str
+        Method for model serialization, either "json" or "pickle". (Default: "json")
+    names : array-like, str
+        Names for each of the galaxies. If None (default), we'll just guess
+        based on the filenames of the chains assuming that they're named something like
+        [NAME]_chain.npy.
+    catalog_name : str
+        Default: "postprocessed_catalog.hdf5"
+
+    Returns
+    -------
+    Nothing.
+
+    Notes
+    -----
+    TODO:
+    - Allow user-supplied quantiles.
+    - Add additional properties; allow user specification of properties? That might be a whole
+      chore.
+
+    '''
+
+    if (solver_mode == 'mcmc'):
+        postprocess_catalog_mcmc(res_filenames,
+                                 model_filenames,
+                                 model_mode=model_mode,
+                                 names=names,
+                                 catalog_name=catalog_name)
+    elif (solver_mode == 'mle'):
+        postprocess_catalog_mle(res_filenames,
+                                model_filenames,
+                                model_mode=model_mode,
+                                names=names,
+                                catalog_name=catalog_name)
+    else:
+        print('solver_mode must be one of "mcmc" or "mle".')
+        return None
+
 
 if (__name__ == '__main__'):
 
@@ -223,10 +342,12 @@ if (__name__ == '__main__'):
     # alias "lightning_postprocess=python $lightning_dir/lightning/postprocessing.py"
     # to .bash_profile so that you can run it as a CLI app
 
-    chain_listfile = sys.argv[1]
+    res_listfile = sys.argv[1]
     model_listfile = sys.argv[2]
     outname = sys.arv[3]
+    mode = sys.argv[4]
 
-    postprocess_catalog(chain_listfile,
+    postprocess_catalog(res_listfile,
                         model_listfile,
-                        catalog_name=outname)
+                        catalog_name=outname,
+                        solver_mode=mode)
