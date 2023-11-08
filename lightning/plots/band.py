@@ -45,9 +45,9 @@ class ModelBand:
         lo, hi = np.quantile(np.array(self.y), axis=0, q=q)
 
         if ax is None:
-            plt.fill_between(self.x, lo, hi, **kwargs)
+            return plt.fill_between(self.x, lo, hi, **kwargs)
         else:
-            ax.fill_between(self.x, lo, hi, **kwargs)
+            return ax.fill_between(self.x, lo, hi, **kwargs)
 
     def line(self, q=0.50, ax=None, **kwargs):
         '''
@@ -58,9 +58,9 @@ class ModelBand:
         l = np.quantile(np.array(self.y), axis=0, q=q)
 
         if ax is None:
-            plt.plot(self.x, l, **kwargs)
+            return plt.plot(self.x, l, **kwargs)
         else:
-            ax.plot(self.x, l, **kwargs)
+            return ax.plot(self.x, l, **kwargs)
 
     def realizations(self, num=1, replace=False, ax=None, **kwargs):
         '''
@@ -72,8 +72,11 @@ class ModelBand:
 
         real = np.array(self.y)[idcs,:]
 
+        lines = []
         for l in real:
             if ax is None:
-                plt.plot(self.x, l, **kwargs)
+                line, = plt.plot(self.x, l, **kwargs)
             else:
-                ax.plot(self.x, l, **kwargs)
+                line, = ax.plot(self.x, l, **kwargs)
+            lines.append(line)
+        return lines
