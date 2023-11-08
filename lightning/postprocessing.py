@@ -90,7 +90,7 @@ def postprocess_catalog_mcmc(chain_filenames,
                     parameters.create_dataset('agn/%s/hi' % (pname), data=p_quant[2])
                     parameters.create_dataset('agn/%s/best' % (pname), data=p_best)
             if (st_xray_params is not None):
-                for j,pname in enumerate(lgh.xray_st_em.param_names):
+                for j,pname in enumerate(lgh.xray_stellar_em.param_names):
                     p_quant = np.nanquantile(st_xray_params[:,j], q=(0.16, 0.50, 0.84))
                     p_best = st_xray_params[bestfit, j]
                     parameters.create_dataset('xray_stellar/%s/lo' % (pname), data=p_quant[0])
@@ -196,7 +196,7 @@ def postprocess_catalog_mle(res_filenames,
                 for j,pname in enumerate(lgh.agn.param_names):
                     parameters.create_dataset('agn/%s/best' % (pname), data=agn_params)
             if (st_xray_params is not None):
-                for j,pname in enumerate(lgh.xray_st_em.param_names):
+                for j,pname in enumerate(lgh.xray_stellar_em.param_names):
                     parameters.create_dataset('xray_stellar/%s/best' % (pname), data=st_xray_params)
             if (agn_xray_params is not None):
                 for j,pname in enumerate(lgh.xray_agn_em.param_names):
