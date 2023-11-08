@@ -13,7 +13,7 @@
       wrong when everything is working as intended.
 '''
 
-# Standard library
+# Standard libraries
 import time
 import warnings
 import numbers
@@ -21,6 +21,7 @@ import numbers
 import numpy as np
 from scipy.integrate import trapz
 from scipy.interpolate import interp1d
+from scipy.special import erf
 # Astropy
 from astropy.cosmology import FLRW, FlatLambdaCDM
 import astropy.units as u
@@ -94,6 +95,13 @@ class Lightning:
         component, rather than per filter.
     cosmology : astropy.cosmology.FlatLambdaCDM
         The cosmology to assume.
+    uplim_handling : {'exact', 'approx'}
+        A string specifying how upper limits are to be handled. In the case of 'exact' we treat
+        them as derived in e.g. Appendix A of Sawicki et al. (2012). In the case of 'approx', upper limits
+        are treated as measurements of 0 with a 1 sigma uncertainty equal to the 1 sigma flux limit. This option
+        is provided for consistency with the handling of limits in IDL lightning. Our convention for inputting upper
+        limits remains that they should be specified as a measurement of 0 with a 1 sigma uncertainty equal to the
+        1 sigma flux limit. (Default: 'exact')
 
     Attributes
     ----------
@@ -148,7 +156,8 @@ class Lightning:
                  lightning_filter_path=None,
                  print_setup_time=False,
                  model_unc=None,
-                 cosmology=None):
+                 cosmology=None,
+                 uplim_handling='exact'):
 
         self.filter_labels = filter_labels
         self.path_to_filters = lightning_filter_path
@@ -216,6 +225,10 @@ class Lightning:
                 assert (np.all(model_unc < 1)), "All elements of 'model_unc' should be numbers less than 1."
                 assert (len(model_unc) == len(self.filter_labels)), "Length of 'model_unc' (%d) must match length of 'filter_labels' (%d)" % (len(model_unc), len(self.filter_labels))
                 self.model_unc = model_unc
+
+        if (uplim_handling not in ['exact', 'approx']):
+            raise ValueError("Options for 'uplim_handling' are 'exact' and 'approx'.")
+        self.uplim_handling = uplim_handling
 
         # Initialize wavelength grid
         # Some error handling here would be nice
@@ -1247,12 +1260,20 @@ class Lightning:
         if ((self.Lnu_obs is None) or (self.Lnu_unc is None)):
             raise AttributeError('In order to calculate model likelihood, observed flux and uncertainty must be set.')
 
+        uplim_mask = (self.Lnu_obs == 0) & (self.Lnu_unc > 0)
+
         lnu_model, _ = self.get_model_lnu(params, stepwise=False) # ndarray(Nmodels, Nfilters)
 
         # Add in the model contribution to the uncertainty in quadrature.
         total_unc2 = self.Lnu_unc[None,:]**2 + (lnu_model * self.model_unc[None,:])**2
 
-        chi2 = np.nansum((lnu_model - self.Lnu_obs[None,:])**2 / total_unc2, axis=-1)
+        if (self.uplim_handling == 'approx'):
+            chi2 = np.nansum((lnu_model - self.Lnu_obs[None,:])**2 / total_unc2, axis=-1)
+        elif (self.uplim_handling == 'exact'):
+            chi2_det = np.nansum((lnu_model[:,~uplim_mask] - self.Lnu_obs[None,~uplim_mask])**2 / total_unc2[:,~uplim_mask], axis=-1)
+            sigmod = lnu_model[:,uplim_mask] * self.model_unc[None,uplim_mask]
+            chi2_undet = -2 * np.nansum(np.log(np.sqrt(np.pi / 2) * sigmod * (1 + erf((self.Lnu_unc[None,uplim_mask] - lnu_model[:,uplim_mask]) / np.sqrt(2) / sigmod))), axis=-1)
+            chi2 = chi2_det + chi2_undet
 
         if (self.xray_mode == 'flux'):
 
@@ -1261,14 +1282,21 @@ class Lightning:
 
             # The implicit assumption here is that all X-ray bands are NaN in 'lnu_model'
             # and that all non-X-ray bands are NaN in 'lnu_xray'
-            chi2_xray = np.nansum((lnu_xray - self.Lnu_obs[None,:])**2 / total_unc2, axis=-1)
+            if (self.uplim_handling == 'approx'):
+                chi2_xray = np.nansum((lnu_xray - self.Lnu_obs[None,:])**2 / total_unc2, axis=-1)
+            elif (self.uplim_handling == 'exact'):
+                chi2_xray_det = np.nansum((lnu_xray[:,~uplim_mask] - self.Lnu_obs[None,~uplim_mask])**2 / total_unc2[:,~uplim_mask], axis=-1)
+                sigmod = lnu_xray[:,uplim_mask] * self.model_unc[None,uplim_mask]
+                chi2_xray_undet = -2 * np.nansum(np.log(np.sqrt(np.pi / 2) * sigmod * (1 + erf((self.Lnu_unc[None,uplim_mask] - lnu_xray[:,uplim_mask]) / np.sqrt(2) / sigmod))), axis=-1)
+                chi2_xray = chi2_xray_det + chi2_xray_undet
+
             chi2 += chi2_xray
 
             #print(chi2_xray[0:5])
 
         elif (self.xray_mode == 'counts'):
 
-            #raise NotImplementedError("Haven't figured that out yet.")
+            # No such thing as an upper limit in this case.
 
             counts_xray = self.get_xray_model_counts(params)
             total_unc2 = self.xray_counts_unc[None, :]**2 + (counts_xray * self.model_unc[None,:])**2
@@ -1735,22 +1763,24 @@ class Lightning:
             # Then the user originally specified DL rather
             # than a redshift.
             redshift_tmp = None
-            DL_tmp = self.DL
+            DL_tmp = float(self.DL)
         else:
-            redshift_tmp = self.redshift
-            DL_tmp = self.DL
+            redshift_tmp = float(self.redshift)
+            DL_tmp = float(self.DL)
 
         if (self.xray_arf is not None):
             arf_tmp = dict(self.xray_arf)
-            for key in arf_tmp: arf_tmp[key] = list(arf_tmp[key])
+            for key in arf_tmp:
+                # arf_tmp[key] = list(float(arf_tmp[key]))
+                arf_tmp[key] = [float(x) for x in arf_tmp[key]]
         else:
             arf_tmp = None
 
-        dict = {'filter_labels': list(self.filter_labels),
+        out = {'filter_labels': list(self.filter_labels),
                 'redshift': redshift_tmp,
                 'lum_dist': DL_tmp,
-                'flux_obs': self._flux_obs.tolist(),
-                'flux_obs_unc': self._flux_unc.tolist(),
+                'flux_obs': self._flux_obs.tolist() if self._flux_obs is not None else None,
+                'flux_obs_unc': self._flux_unc.tolist() if self._flux_unc is not None else None,
                 'wave_grid': self.wave_grid_rest.tolist(),
                 'SFH_type': self.SFH_type,
                 'ages': self.ages.tolist(),
@@ -1765,7 +1795,7 @@ class Lightning:
                 'xray_wave_grid': self.xray_wave_grid_rest.tolist() if self.xray_mode not in [None, 'None'] else None,
                 'xray_arf': arf_tmp,
                 'xray_exposure': None if self.xray_exposure is None else self.xray_exposure.tolist(),
-                'galactic_NH': self.galactic_NH,
+                'galactic_NH': float(self.galactic_NH),
                 'lightning_filter_path': self.path_to_filters,
                 'model_unc': self.model_unc.tolist(),
                 'cosmology': {'H0': self.cosmology._H0.value,
@@ -1773,11 +1803,11 @@ class Lightning:
                               }
                 }
 
-        return dict
+        return out
 
     def save_json(self, fname):
         '''
-        Save the information needed to recoonstruct this Lightning object to a json
+        Save the information needed to reconstruct this Lightning object to a json
         file.
 
         The Lightning object can be remade using ``Lightning.from_json``.
