@@ -30,8 +30,8 @@ from astropy.utils.exceptions import AstropyUserWarning
 from astropy.table import Table
 from astropy.io import ascii
 # Lightning
-from .sfh import PiecewiseConstSFH
-from .sfh.delayed_exponential import DelayedExponentialSFH
+from .sfh import PiecewiseConstSFH, DelayedExponentialSFH, SingleExponentialSFH
+#from .sfh.delayed_exponential import
 from .stellar import StellarModel
 from .dust import DL07Dust as DustModel # Move inside setup function where needed?
 from .agn import AGNModel # Move inside setup function where needed?
@@ -275,18 +275,18 @@ class Lightning:
         self.nu_obs = const.c.to(u.um / u.s).value / self.wave_obs
         t2 = time.time()
 
-        # This block steps up the star formation history and
+        # This block sets up the star formation history and
         # stellar population models
-        allowed_SFHs = ['Piecewise-Constant', 'Delayed-Exponential']
+        allowed_SFHs = ['Piecewise-Constant', 'Delayed-Exponential', 'Single-Exponential']
         if SFH_type not in allowed_SFHs:
             print('Allowed SFHs are:', allowed_SFHs)
             raise ValueError("SFH type '%s' not understood." % (SFH_type))
         else:
             self.SFH_type = SFH_type
 
+        univ_age = self.cosmology.age(self.redshift).value
         if (self.SFH_type == 'Piecewise-Constant'):
             # Define default stellar age bins
-            univ_age = self.cosmology.age(self.redshift).value
             if (ages is None):
                 if (univ_age < 1):
                     raise ValueError('Redshift too large; fewer than 4 age bins in SFH.')
@@ -299,20 +299,23 @@ class Lightning:
 
 
             self.ages = np.sort(self.ages)
-            if (np.any(self.ages > univ_age * 1e9)):
+            if (np.any(self.ages > (univ_age * 1e9))):
                 raise ValueError('None of the provided age bins can exceed the age of the Universe at z.')
 
             self.Nages = len(self.ages) - 1
 
         else:
-            univ_age = self.cosmology.age(self.redshift).value
             if (ages is None):
+                # This is not the ideal age grid for the stellar population models, and the choice of the ideal
+                # grid is non-trivial. The best we might be able to do is to fall back to the ages the models
+                # were originally generated at.
                 self.ages = np.logspace(6, np.log10(univ_age * 1e9), 20) # Log spaced grid from 1 Myr to the age of the Universe.
+                self.ages[-1] = (univ_age * 1e9)
             else:
                 self.ages = np.array(ages)
 
             self.ages = np.sort(self.ages)
-            if (np.any(self.ages > univ_age * 1e9)):
+            if (np.any(self.ages > (univ_age * 1e9))):
                 raise ValueError('None of the provided ages can exceed the age of the Universe at z.')
 
             self.Nages = len(self.ages)
@@ -548,6 +551,9 @@ class Lightning:
             step=True
         elif (self.SFH_type == 'Delayed-Exponential'):
             self.sfh = DelayedExponentialSFH(self.ages)
+            step=False
+        elif (self.SFH_type == 'Single-Exponential'):
+            self.sfh = SingleExponentialSFH(self.ages)
             step=False
         else:
             raise ValueError("SFH type (%s) not understood." % (self.SFH_type))
