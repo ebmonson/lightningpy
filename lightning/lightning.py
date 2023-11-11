@@ -1847,6 +1847,7 @@ class Lightning:
                         flux_obs_unc=config['flux_obs_unc'],
                         wave_grid=np.array(config['wave_grid']),
                         SFH_type=config['SFH_type'],
+                        ages=np.array(config['ages']),
                         atten_type=config['atten_type'],
                         dust_emission=config['dust_emission'],
                         agn_emission=config['agn_emission'],
