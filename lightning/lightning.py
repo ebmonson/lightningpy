@@ -1270,6 +1270,9 @@ class Lightning:
 
         lnu_model, _ = self.get_model_lnu(params, stepwise=False) # ndarray(Nmodels, Nfilters)
 
+        if (len(lnu_model.shape) == 1):
+            lnu_model = lnu_model.reshape(1,-1)
+
         # Add in the model contribution to the uncertainty in quadrature.
         total_unc2 = self.Lnu_unc[None,:]**2 + (lnu_model * self.model_unc[None,:])**2
 
@@ -1284,6 +1287,8 @@ class Lightning:
         if (self.xray_mode == 'flux'):
 
             lnu_xray, _ = self.get_xray_model_lnu(params)
+            if (len(lnu_xray.shape) == 1):
+                lnu_xray = lnu_xray.reshape(1,-1)
             total_unc2 = self.Lnu_unc[None,:]**2 + (lnu_xray * self.model_unc[None,:])**2
 
             # The implicit assumption here is that all X-ray bands are NaN in 'lnu_model'
