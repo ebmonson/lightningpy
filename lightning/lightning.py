@@ -1439,7 +1439,7 @@ class Lightning:
         return np.any(ob_mask, axis=1)
 
 
-    def _fit_emcee(self, p0, **kwargs):
+    def _fit_emcee(self, p0, Nwalkers=64, Nsteps=20000, progress=True, **kwargs):
         '''
         Helper function to fit with emcee
         '''
@@ -1449,8 +1449,6 @@ class Lightning:
         Ndim = self.Nparams
 
         priors = kwargs['priors']
-        Nwalkers = kwargs['Nwalkers']
-        Nsteps = kwargs['Nsteps']
 
         try:
             const_dim = kwargs['const_dim']
@@ -1492,7 +1490,7 @@ class Lightning:
 
         #post_burn = sampler.run_mcmc(p0, N_burn)
 
-        state = sampler.run_mcmc(p0[:,var_dim], Nsteps, progress=True)
+        state = sampler.run_mcmc(p0[:,var_dim], Nsteps, progress=progress)
 
         return sampler
 
@@ -1621,7 +1619,7 @@ class Lightning:
             const_dim = np.array([pr is None for pr in priors])
             mcmc_p0[:,const_dim] = res.x[const_dim]
             mcmc = self.fit(mcmc_p0, method='emcee', Nwalkers=MCMC_kwargs['Nwalkers'], Nsteps=MCMC_kwargs['Nsteps'],
-                            priors=priors, const_dim=const_dim)
+                            priors=priors, const_dim=const_dim, progress=MCMC_kwargs['progress'])
 
             return res, mcmc
         else:
