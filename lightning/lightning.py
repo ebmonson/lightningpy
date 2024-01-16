@@ -1280,8 +1280,12 @@ class Lightning:
             chi2 = np.nansum((lnu_model - self.Lnu_obs[None,:])**2 / total_unc2, axis=-1)
         elif (self.uplim_handling == 'exact'):
             chi2_det = np.nansum((lnu_model[:,~uplim_mask] - self.Lnu_obs[None,~uplim_mask])**2 / total_unc2[:,~uplim_mask], axis=-1)
-            sigmod = lnu_model[:,uplim_mask] * self.model_unc[None,uplim_mask]
-            chi2_undet = -2 * np.nansum(np.log(np.sqrt(np.pi / 2) * sigmod * (1 + erf((self.Lnu_unc[None,uplim_mask] - lnu_model[:,uplim_mask]) / np.sqrt(2) / sigmod))), axis=-1)
+            if np.count_nonzero(uplim_mask) > 0:
+                sigmod = lnu_model[:,uplim_mask] * self.model_unc[None,uplim_mask]
+                arg = np.sqrt(np.pi / 2) * sigmod * (1 + erf((self.Lnu_unc[None,uplim_mask] - lnu_model[:,uplim_mask]) / np.sqrt(2) / sigmod))
+                chi2_undet = -2 * np.nansum(np.log(arg), axis=-1)
+            else:
+                chi2_undet = 0 * chi2_det
             chi2 = chi2_det + chi2_undet
 
         if (self.xray_mode == 'flux'):
@@ -1297,8 +1301,12 @@ class Lightning:
                 chi2_xray = np.nansum((lnu_xray - self.Lnu_obs[None,:])**2 / total_unc2, axis=-1)
             elif (self.uplim_handling == 'exact'):
                 chi2_xray_det = np.nansum((lnu_xray[:,~uplim_mask] - self.Lnu_obs[None,~uplim_mask])**2 / total_unc2[:,~uplim_mask], axis=-1)
-                sigmod = lnu_xray[:,uplim_mask] * self.model_unc[None,uplim_mask]
-                chi2_xray_undet = -2 * np.nansum(np.log(np.sqrt(np.pi / 2) * sigmod * (1 + erf((self.Lnu_unc[None,uplim_mask] - lnu_xray[:,uplim_mask]) / np.sqrt(2) / sigmod))), axis=-1)
+                if np.count_nonzero(uplim_mask) > 0:
+                    sigmod = lnu_xray[:,uplim_mask] * self.model_unc[None,uplim_mask]
+                    arg = np.sqrt(np.pi / 2) * sigmod * (1 + erf((self.Lnu_unc[None,uplim_mask] - lnu_xray[:,uplim_mask]) / np.sqrt(2) / sigmod))
+                    chi2_xray_undet = -2 * np.nansum(np.log(arg), axis=-1)
+                else:
+                    chi2_xray_undet = 0 * chi2_xray_det
                 chi2_xray = chi2_xray_det + chi2_xray_undet
 
             chi2 += chi2_xray
@@ -1615,6 +1623,11 @@ class Lightning:
             import emcee
             rng = np.random.default_rng()
             mcmc_p0 = res.x[None,:] + rng.normal(loc=0, scale=MCMC_kwargs['init_scale'], size=(MCMC_kwargs['Nwalkers'], len(res.x)))
+            # If any parameter's best fit is at a boundary, a gaussian ball initialization has a 50% chance of initializing it out of bounds.
+            dlo = mcmc_p0 - fullbounds.lb[None,:] # should be positive
+            dhi = fullbounds.ub[None,:] - mcmc_p0 # should be positive
+            mcmc_p0[dlo < 0] = mcmc_p0[dlo < 0] - 2 * dlo[dlo < 0]
+            mcmc_p0[dhi < 0] = mcmc_p0[dhi < 0] + 2 * dhi[dhi < 0]
             priors = [UniformPrior(b) if (b[1] - b[0]) != 0 else None for b in zip(fullbounds.lb, fullbounds.ub)]
             const_dim = np.array([pr is None for pr in priors])
             mcmc_p0[:,const_dim] = res.x[const_dim]
