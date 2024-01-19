@@ -80,23 +80,48 @@ class FunctionalSFH:
         if len(params.shape) == 1:
             params = params.reshape(1,-1)
 
-        assert (len(self.age) == arr.shape[0]), "Number of stellar age points in SFH model and stellar model must match."
+        Nmodels = params.shape[0]
+        Nages = len(self.age)
+
+        #assert (len(self.age) == arr.shape[0]), "Number of stellar age points in SFH model and stellar model must match."
         if self.Nparams is not None:
             assert (self.Nparams == params.shape[1]), "Number of parameters must match the number (%d) expected by this model (%s)" % (self.Nparams, self.model_name)
-        # The input array might be a spectrum, with shape (Nages, Nwave)
-        if (len(arr.shape) == 2):
-            arr2d = True
-        else:
-            arr2d = False
 
-        Nmodels = params.shape[0]
-
+        # This is always 2D
         sfrt = self.evaluate(params).reshape(Nmodels,-1) # (Nmodels, Nages)
 
-        if (arr2d):
-            res = sfrt[:, :, None] * arr[None, :, :]
+        # The input array might be a spectrum, with shape (Nages, Nwave),
+        # or a multidimensional model with shape (Nmodels, Nages, Nwave)
+        # so we handle these different cases.
+        input_dims = len(arr.shape)
+        if input_dims == 1:
+            #output_dims = 2
+            #output_shape = (Nmodels, Nages)
+            assert (arr.shape[0] == Nages), "Number of stellar age points in SFH model and stellar model must match."
+            res = sfrt * arr[None,:]
+        if input_dims == 2:
+            #output_dims = 3
+            #output_shape = (Nmodels, Nages, arr.shape[-1])
+            assert (arr.shape[0] == Nages), "Number of stellar age points in SFH model and stellar model must match."
+            res = sfrt[:,:,None] * arr[None,:,:]
+        elif input_dims == 3:
+            #output_dims = 3
+            #output_shape = (Nmodels, Nages, arr.shape[-1])
+            assert (arr.shape == (Nmodels, Nages, arr.shape[-1]))
+            res = sfrt[:,:,None] * arr
         else:
-            res = sfrt * arr[None, :]
+            raise ValueError('Input `arr` has too many (>3) dimensions.')
+
+        # if (len(arr.shape) == 2):
+        #     arr2d = True
+        # else:
+        #     arr2d = False
+
+        # if (arr2d):
+        #     res = sfrt[:, :, None] * arr[None, :, :] # (Nmodels, Nages, Nwave)
+        #     #res = sfrt[:,:, None] * np.atleast_3d(arr)
+        # else:
+        #     res = sfrt * arr[None, :] # (Nmodels, Nages)
 
         return res
 
@@ -110,7 +135,7 @@ class FunctionalSFH:
         if len(params.shape) == 1:
             params = params.reshape(1,-1)
 
-        assert (len(self.age) == arr.shape[0]), "Number of stellar age points in SFH model and stellar model must match."
+        # assert (len(self.age) == arr.shape[0]), "Number of stellar age points in SFH model and stellar model must match."
         if self.Nparams is not None:
             assert (self.Nparams == params.shape[1]), "Number of parameters must match the number (%d) expected by this model (%s)" % (self.Nparams, self.model_name)
 
@@ -231,23 +256,52 @@ class PiecewiseConstSFH:
         if len(params.shape) == 1:
             params = params.reshape(1,-1)
 
-        assert (len(self.age) - 1 == arr.shape[0]), "Number of stellar age points in SFH model and stellar model must match."
+        Nmodels = params.shape[0]
+        Nages = len(self.age) - 1
+
+        #assert (len(self.age) - 1 == arr.shape[0]), "Number of stellar age points in SFH model and stellar model must match."
         if self.Nparams is not None:
             assert (self.Nparams == params.shape[1]), "Number of parameters must match the number (%d) expected by this model (%s)" % (self.Nparams, self.model_name)
-        # The input array might be a spectrum, with shape (Nages, Nwave)
-        if (len(arr.shape) == 2):
-            arr2d = True
-        else:
-            arr2d = False
 
-        Nmodels = params.shape[0]
-
+        # This is always 2D
         sfrt = self.evaluate(params).reshape(Nmodels,-1) # (Nmodels, Nages)
 
-        if (arr2d):
-            res = sfrt[:, :, None] * arr[None, :, :]
+        # The input array might be a spectrum, with shape (Nages, Nwave),
+        # or a multidimensional model with shape (Nmodels, Nages, Nwave)
+        # so we handle these different cases.
+        input_dims = len(arr.shape)
+        if input_dims == 1:
+            #output_dims = 2
+            #output_shape = (Nmodels, Nages)
+            assert (arr.shape[0] == Nages),"Number of stellar age points in SFH model and stellar model must match."
+            res = sfrt * arr[None,:]
+        if input_dims == 2:
+            #output_dims = 3
+            #output_shape = (Nmodels, Nages, arr.shape[-1])
+            assert (arr.shape[0] == Nages),"Number of stellar age points in SFH model and stellar model must match."
+            res = sfrt[:,:,None] * arr[None,:,:]
+        elif input_dims == 3:
+            #output_dims = 3
+            #output_shape = (Nmodels, Nages, arr.shape[-1])
+            assert (arr.shape == (Nmodels, Nages, arr.shape[-1]))
+            res = sfrt[:,:,None] * arr
         else:
-            res = sfrt * arr[None, :]
+            raise ValueError('Input `arr` has too many (>3) dimensions.')
+
+        # # The input array might be a spectrum, with shape (Nages, Nwave)
+        # if (len(arr.shape) == 2):
+        #     arr2d = True
+        # else:
+        #     arr2d = False
+        #
+        # Nmodels = params.shape[0]
+        #
+        # sfrt = self.evaluate(params).reshape(Nmodels,-1) # (Nmodels, Nages)
+        #
+        # if (arr2d):
+        #     res = sfrt[:, :, None] * arr[None, :, :]
+        # else:
+        #     res = sfrt * arr[None, :]
 
         return res
 
@@ -261,14 +315,14 @@ class PiecewiseConstSFH:
         if len(params.shape) == 1:
             params = params.reshape(1,-1)
 
-        assert (len(self.age) - 1 == arr.shape[0]), "Number of stellar age bins in SFH model and stellar model must match."
+        #assert (len(self.age) - 1 == arr.shape[0]), "Number of stellar age bins in SFH model and stellar model must match."
         if self.Nparams is not None:
             assert (self.Nparams == params.shape[1]), "Number of parameters provided (%d) must match the number (%d) expected by this model (%s)" % (params.shape[1], self.Nparams, self.model_name)
-        # The input array might be a spectrum, with shape (Nages, Nwave)
-        if (len(arr.shape) == 2):
-            arr2d = True
-        else:
-            arr2d = False
+        # # The input array might be a spectrum, with shape (Nages, Nwave)
+        # if (len(arr.shape) == 2):
+        #     arr2d = True
+        # else:
+        #     arr2d = False
 
         Nmodels = params.shape[0]
 

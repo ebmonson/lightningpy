@@ -111,8 +111,10 @@ class BaseEmissionModel():
             is out of bounds.
         '''
 
-        if len(params.shape) == 1:
+        if (len(params.shape) == 1) and (self.Nparams > 1):
             params = params.reshape(1,-1)
+        elif (len(params.shape) == 1) and (self.Nparams == 1):
+            params = params.reshape(-1,1)
 
         if self.Nparams is not None:
             assert (self.Nparams == params.shape[1]), "Number of parameters must match the number (%d) expected by this model (%s)" % (self.Nparams, self.model_name)

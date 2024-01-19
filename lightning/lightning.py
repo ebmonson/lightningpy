@@ -32,7 +32,7 @@ from astropy.io import ascii
 # Lightning
 from .sfh import PiecewiseConstSFH, DelayedExponentialSFH, SingleExponentialSFH
 #from .sfh.delayed_exponential import
-from .stellar import StellarModel
+from .stellar import PEGASEModel as StellarModel
 from .dust import DL07Dust as DustModel # Move inside setup function where needed?
 from .agn import AGNModel # Move inside setup function where needed?
 from .xray import StellarPlaw, AGNPlaw, Qsosed
