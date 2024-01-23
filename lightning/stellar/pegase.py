@@ -83,7 +83,7 @@ class PEGASEModel(BaseEmissionModel):
     model_type = 'Stellar-Emission'
     gridded = False
 
-    def _construct_model(self, age=None, step=True, Z_met=0.020, wave_grid=None, nebular_effects=True):
+    def _construct_model(self, age=None, step=True, Z_met=0.020, wave_grid=None, cosmology=None, nebular_effects=True):
         '''
             Load the appropriate models from the IDL files Rafael creates and either integrate
             them in bins (if ``step==True``) or interpolate them to an age grid otherwise.
@@ -93,14 +93,30 @@ class PEGASEModel(BaseEmissionModel):
             self.path_to_models = self.path_to_models + '04-single_burst/Kroupa01/' + 'Kroupa01_Z%5.3f_nebular_spec.idl' % (Z_met)
         else:
             self.path_to_models = self.path_to_models + '04-single_burst/Kroupa01/' + 'Kroupa01_Z%5.3f_spec.idl' % (Z_met)
-        if (age is None):
-            raise ValueError('Ages of stellar models must be specified.')
-
-        self.age = age
-        self.step = step
-        self.metallicity = Z_met
 
         burst_dict = readsav(self.path_to_models)
+
+        if cosmology is None:
+            from astropy.cosmology import FlatLambdaCDM
+            cosmology = FlatLambdaCDM(H0=70, Om0=0.3)
+
+        univ_age = cosmology.age(self.redshift).value * 1e9
+
+        if (age is None):
+            if (not step):
+                #raise ValueError('Ages of stellar models must be specified.')
+                # Truncate gridded ages to age of Universe.
+
+                self.age = np.array(list(burst_dict['time'][burst_dict['time'] <= univ_age]) + [univ_age])
+            else:
+                raise ValueError('For piecewise SFH, age bins for stellar models must be specified.')
+        else:
+            self.age = age
+
+        assert (~np.any(self.age > univ_age)), 'The provided ages cannot exceed the age of the Universe at z.'
+
+        self.step = step
+        self.metallicity = Z_met
 
         # These are views into the original dict and so
         # are read-only.

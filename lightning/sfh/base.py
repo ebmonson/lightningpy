@@ -94,12 +94,12 @@ class FunctionalSFH:
         # or a multidimensional model with shape (Nmodels, Nages, Nwave)
         # so we handle these different cases.
         input_dims = len(arr.shape)
-        if input_dims == 1:
+        if (input_dims == 1) or (input_dims == 0):
             #output_dims = 2
             #output_shape = (Nmodels, Nages)
             assert (arr.shape[0] == Nages), "Number of stellar age points in SFH model and stellar model must match."
             res = sfrt * arr[None,:]
-        if input_dims == 2:
+        elif input_dims == 2:
             #output_dims = 3
             #output_shape = (Nmodels, Nages, arr.shape[-1])
             assert (arr.shape[0] == Nages), "Number of stellar age points in SFH model and stellar model must match."
@@ -270,12 +270,12 @@ class PiecewiseConstSFH:
         # or a multidimensional model with shape (Nmodels, Nages, Nwave)
         # so we handle these different cases.
         input_dims = len(arr.shape)
-        if input_dims == 1:
+        if (input_dims == 1) or (input_dims == 0):
             #output_dims = 2
             #output_shape = (Nmodels, Nages)
             assert (arr.shape[0] == Nages),"Number of stellar age points in SFH model and stellar model must match."
             res = sfrt * arr[None,:]
-        if input_dims == 2:
+        elif input_dims == 2:
             #output_dims = 3
             #output_shape = (Nmodels, Nages, arr.shape[-1])
             assert (arr.shape[0] == Nages),"Number of stellar age points in SFH model and stellar model must match."

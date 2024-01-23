@@ -289,7 +289,7 @@ class Lightning:
             # Define default stellar age bins
             if (ages is None):
                 if (univ_age < 1):
-                    raise ValueError('Redshift too large; fewer than 4 age bins in SFH.')
+                    raise ValueError('Redshift too large; fewer than 4 default age bins in SFH.')
                 elif (univ_age < 5):
                     self.ages = np.array([0, 1.0e7, 1.0e8, 1.0e9, univ_age * 1e9])
                 else:
@@ -309,16 +309,17 @@ class Lightning:
                 # This is not the ideal age grid for the stellar population models, and the choice of the ideal
                 # grid is non-trivial. The best we might be able to do is to fall back to the ages the models
                 # were originally generated at.
-                self.ages = np.logspace(6, np.log10(univ_age * 1e9), 20) # Log spaced grid from 1 Myr to the age of the Universe.
-                self.ages[-1] = (univ_age * 1e9)
+                #self.ages = np.logspace(6, np.log10(univ_age * 1e9), 20) # Log spaced grid from 1 Myr to the age of the Universe.
+                #self.ages[-1] = (univ_age * 1e9)
+                self.ages = None # Fall back to whatever grid the SPS models have
             else:
                 self.ages = np.array(ages)
 
-            self.ages = np.sort(self.ages)
-            if (np.any(self.ages > (univ_age * 1e9))):
-                raise ValueError('None of the provided ages can exceed the age of the Universe at z.')
+                self.ages = np.sort(self.ages)
+                if (np.any(self.ages > (univ_age * 1e9))):
+                    raise ValueError('None of the provided ages can exceed the age of the Universe at z.')
 
-            self.Nages = len(self.ages)
+                self.Nages = len(self.ages)
 
 
         self._setup_stellar()
@@ -546,20 +547,28 @@ class Lightning:
         Initialize SFH model and stellar population.
         '''
 
+        step = 'Piecewise' in self.SFH_type
+
+        self.stars = StellarModel(self.filter_labels, self.redshift, age=self.ages,
+                                  Z_met=0.020, step=step, cosmology=self.cosmology,
+                                  wave_grid=self.wave_grid_rest)
+
+        if self.ages is None:
+            self.ages = self.stars.age
+            self.Nages = len(self.Nages)
+
         if (self.SFH_type == 'Piecewise-Constant'):
             self.sfh = PiecewiseConstSFH(self.ages)
-            step=True
+            #step=True
         elif (self.SFH_type == 'Delayed-Exponential'):
             self.sfh = DelayedExponentialSFH(self.ages)
-            step=False
+            #step=False
         elif (self.SFH_type == 'Single-Exponential'):
             self.sfh = SingleExponentialSFH(self.ages)
-            step=False
+            #step=False
         else:
             raise ValueError("SFH type (%s) not understood." % (self.SFH_type))
 
-        self.stars = StellarModel(self.filter_labels, self.redshift, age=self.ages,
-                                  Z_met=0.020, step=step, wave_grid=self.wave_grid_rest)
 
 
     def _setup_dust_att(self):

@@ -95,7 +95,7 @@ class BPASSModel(BaseEmissionModel):
     model_type = 'Stellar-Emission'
     gridded = False
 
-    def _construct_model(self, age=None, step=True, Z_met=0.020, wave_grid=None, nebular_effects=True, dust_grains=False):
+    def _construct_model(self, age=None, step=True, Z_met=0.020, wave_grid=None, cosmology=True, nebular_effects=True, dust_grains=False):
         '''
             Load the appropriate models from the BPASS h5 hiles and either integrate
             them in bins (if ``step==True``) or interpolate them to an age grid otherwise.
@@ -119,18 +119,30 @@ class BPASSModel(BaseEmissionModel):
         else:
             self.path_to_models = self.path_to_models + 'BPASS_Cloudy/imf_135_300/' + 'BPASS_imf135_300_z%s_bin_ng.h5' % (Z_str)
 
-        # We should change this to allow/encourage the use of the default age grid
-        # for continuous models.
+        f = h5py.File(self.path_to_models)
+
+        if cosmology is None:
+            from astropy.cosmology import FlatLambdaCDM
+            cosmology = FlatLambdaCDM(H0=70, Om0=0.3)
+
+        univ_age = cosmology.age(self.redshift).value * 1e9
+
         if (age is None):
-            raise ValueError('Ages of stellar models must be specified.')
-        self.age = age
+            if (not step):
+                #raise ValueError('Ages of stellar models must be specified.')
+                # Truncate gridded ages to age of Universe; the oldest age will be
+                # the closest gridded age to the age of the Universe.
+                self.age = np.array(list((f['age'][:])[f['age'][:] <= univ_age]) + [univ_age]) # Time grid
+            elif (step):
+                raise ValueError('For piecewise SFH, age bins for stellar models must be specified.')
+        else:
+            self.age = age
+
+        assert (~np.any(self.age > univ_age)), 'The provided ages cannot exceed the age of the Universe at z.'
+
         self.step = step
         self.metallicity = Z_met
 
-        f = h5py.File(self.path_to_models)
-
-        # These are views into the original dict and so
-        # are read-only.
         wave_model = f['wave'][:] # Wavelength grid, rest frame
         nu_model = f['nu'][:] # Freq grid, rest frame
         time = f['age'][:] # Time grid
@@ -179,8 +191,8 @@ class BPASSModel(BaseEmissionModel):
 
         if (self.step):
 
-            Nbins = len(age) - 1
-            dt_bins = np.array(age[1:]) - np.array(age[:-1])
+            Nbins = len(self.age) - 1
+            dt_bins = np.array(self.age[1:]) - np.array(self.age[:-1])
             if np.any(dt_bins < 10**6.05):
                 raise ValueError('The minimum age bin width is 10**6.05 years; this is set by the time resolution of the source models.')
             self.Nages = Nbins
@@ -202,8 +214,8 @@ class BPASSModel(BaseEmissionModel):
 
                 #if (i == Nbins - 1): dt = 1e6
 
-                ti = age[i]
-                tf = age[i + 1]
+                ti = self.age[i]
+                tf = self.age[i + 1]
                 # bin_width = tf - ti
                 # #n_substeps = (bin_width // dt) # Number of timesteps in bin
                 # dt = bin_width / n_substeps
@@ -275,26 +287,34 @@ class BPASSModel(BaseEmissionModel):
                     if nebular_effects: llines_age[i,...] += np.squeeze(llines[partialbinhi,...] * deltat_partial)
         else:
 
-            Nages = len(age)
+            Nages = len(self.age)
             self.Nages = Nages
 
             if (nebular_effects):
-                lnu_age = np.zeros((Nbins, len(logU), len(wave_model)), dtype='double') # Lnu(wave) per bin and logU
+                lnu_age = np.zeros((self.Nages, len(logU), len(wave_model)), dtype='double') # Lnu(wave) per bin and logU
+                llines_age = np.zeros((self.Nages, len(self.logU), len(self.line_names)), dtype='double')
+
             else:
-                lnu_age = np.zeros((Nbins, len(wave_model)), dtype='double') # Lnu(wave) per bin
+                lnu_age = np.zeros((self.Nages, len(wave_model)), dtype='double') # Lnu(wave) per bin
+                llines_age = np.zeros((self.Nages, len(self.line_names)))
+
 
             #t0 = time_module.time()
 
-            q0_age = np.interp(age, time, q0)
-            lbol_age = np.interp(age, time, lbol)
-            mstar_age = np.interp(age, time, mstar)
+            q0_age = np.interp(self.age, time, q0)
+            lbol_age = np.interp(self.age, time, lbol)
+            mstar_age = np.interp(self.age, time, mstar)
 
             # Vectorize later
             # This isn't really right
             lnu_finterp = interp1d(time, lnu_obs, axis=0)
-            lnu_age = lnu_finterp(tf - time_substeps)
+            lnu_age = lnu_finterp(self.age)
             # for j in np.arange(len(nu_model_obs)):
             #     lnu_age[:,j] = np.interp(age, time, lnu_obs[j,:])
+
+            if (nebular_effects):
+                llines_finterp = interp1d(time, llines, axis=0)
+                llines_age = llines_finterp(self.age)
 
         #t1 = time_module.time()
 
