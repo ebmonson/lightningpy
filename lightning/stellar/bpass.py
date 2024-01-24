@@ -95,7 +95,7 @@ class BPASSModel(BaseEmissionModel):
     model_type = 'Stellar-Emission'
     gridded = False
 
-    def _construct_model(self, age=None, step=True, Z_met=0.020, wave_grid=None, cosmology=True, nebular_effects=True, dust_grains=False):
+    def _construct_model(self, age=None, step=True, Z_met=0.020, wave_grid=None, cosmology=None, nebular_effects=True, dust_grains=False):
         '''
             Load the appropriate models from the BPASS h5 hiles and either integrate
             them in bins (if ``step==True``) or interpolate them to an age grid otherwise.
@@ -357,6 +357,8 @@ class BPASSModel(BaseEmissionModel):
             Star formation history model.
         sfh_params : np.ndarray, (Nmodels, Nparam) or (Nparam,), float32
             Parameters for the star formation history.
+        params : np.ndarray, (Nmodels, 1) or (Nmodels,)
+            Values for logU, if the model includes a nebular component.
         exptau : np.ndarray, (Nmodels, Nwave) or (Nwave,), float32
             ``exp(-tau)`` as a function of wavelength. If this is 2D, the
             size of the first dimension must match the size of the first
@@ -412,8 +414,15 @@ class BPASSModel(BaseEmissionModel):
 
         if (self.nebular):
             # No boundary handling since we did it above.
+            #print('Lnu_obs gridded shape: ', self.Lnu_obs.shape, len(self.Lnu_obs.shape))
             finterp = interp1d(self.logU, self.Lnu_obs, axis=1)
-            Lnu_obs = finterp(params) # (Nages, Nmodels, Nwave)
+            # Lnu_obs = finterp(params)
+            # # params comes in as (Nmodels, 1) so Lnu_obs will have shape ()
+            # if len(Lnu_obs.shape) > 3:
+            #     Lnu_obs = np.squeeze(Lnu_obs, axis=2)
+            Lnu_obs = finterp(params.flatten())
+            #Lnu_obs = np.squeeze(finterp(params)) # (Nages, Nmodels, Nwave)
+            #print('Lnu_obs shape after interpolation: ', Lnu_obs.shape, len(Lnu_obs.shape))
             Lnu_obs = np.swapaxes(Lnu_obs, 0, 1) # (Nmodels, Nages, Nwave)
         else:
             Lnu_obs = self.Lnu_obs # (Nages, Nwave)
@@ -438,7 +447,7 @@ class BPASSModel(BaseEmissionModel):
 
             # We distinguish between piecewise and continuous SFHs here
             if (self.step):
-
+                #print('Lnu_obs shape:', Lnu_obs.shape, len(Lnu_obs.shape))
                 lnu_unattenuated = sfh.sum(sfh_param, Lnu_obs)
 
             else:
@@ -470,6 +479,8 @@ class BPASSModel(BaseEmissionModel):
             Star formation history model.
         sfh_params : np.ndarray, (Nmodels, Nparam) or (Nparam,), float32
             Parameters for the star formation history.
+        params : np.ndarray, (Nmodels, 1) or (Nmodels,)
+            Values for logU, if the model includes a nebular component.
         exptau : np.ndarray, (Nmodels, Nwave) or (Nwave,), float32
             ``exp(-tau)`` as a function of wavelength. If this is 2D, the
             size of the first dimension must match the size of the first
@@ -583,7 +594,7 @@ class BPASSModel(BaseEmissionModel):
         assert (params.shape[0] == Nmodels), 'First dimension of logU array must match first dimension of SFH.'
 
         finterp = interp1d(self.logU, self.line_lum, axis=1)
-        L_lines = finterp(params) # (Nages, Nmodels, Nlines)
+        L_lines = finterp(params.flatten()) # (Nages, Nmodels, Nlines)
         L_lines = np.swapaxes(L_lines, 0, 1) # (Nmodels, Nages, Nlines)
 
         if stepwise:

@@ -32,7 +32,7 @@ from astropy.io import ascii
 # Lightning
 from .sfh import PiecewiseConstSFH, DelayedExponentialSFH, SingleExponentialSFH
 #from .sfh.delayed_exponential import
-from .stellar import PEGASEModel as StellarModel
+from .stellar import PEGASEModel, BPASSModel
 from .dust import DL07Dust as DustModel # Move inside setup function where needed?
 from .agn import AGNModel # Move inside setup function where needed?
 from .xray import StellarPlaw, AGNPlaw, Qsosed
@@ -70,6 +70,8 @@ class Lightning:
     wave_grid : tuple (3,), or np.ndarray, (Nwave,), float32, optional
         Either a tuple specifying a log-spaced wavelength grid, or an array
         giving the wavelengths.
+    stellar_type : {'PEGASE', 'BPASS'}
+        String specifying the simple stellar population models to use.
     SFH_type : {'Piecewise-Constant', 'Delayed-Exponential'}
         String specifying the SFH type to use.
     ages : np.ndarray, (Nages,), float32
@@ -139,12 +141,13 @@ class Lightning:
                  redshift=None, lum_dist=None,
                  flux_obs=None, flux_obs_unc=None,
                  wave_grid=(0.1, 1000, 1200),
+                 stellar_type='PEGASE',
                  SFH_type='Piecewise-Constant', ages=None,
                  atten_type='Modified-Calzetti',
                  dust_emission=False,
                  agn_emission=False,
                  agn_polar_dust=False,
-                 xray_mode='counts',
+                 xray_mode=None,
                  xray_stellar_emission=None,
                  xray_agn_emission=None,
                  xray_absorption=None,
@@ -321,8 +324,14 @@ class Lightning:
 
                 self.Nages = len(self.ages)
 
+        allowed_stars = ['PEGASE', 'BPASS']
+        if stellar_type not in allowed_stars:
+            print('Allowed simple stellar population models are:', allowed_stars)
+            raise ValueError("Stellar type '%s' not understood." % (stellar_type))
+        else:
+            self.stellar_type = stellar_type
+            self._setup_stellar()
 
-        self._setup_stellar()
         t3 = time.time()
 
         # Set up dust attenuation
@@ -395,7 +404,7 @@ class Lightning:
 
         # For later use, make an array of the model components and
         # figure out how many components our total model has
-        self.model_components = [self.sfh, self.atten, self.dust, self.agn,
+        self.model_components = [self.sfh, self.stars, self.atten, self.dust, self.agn,
                                  self.xray_stellar_em, self.xray_agn_em, self.xray_abs_intr]
         self.Nparams = 0
         for mod in self.model_components:
@@ -549,10 +558,19 @@ class Lightning:
 
         step = 'Piecewise' in self.SFH_type
 
-        self.stars = StellarModel(self.filter_labels, self.redshift, age=self.ages,
-                                  Z_met=0.020, step=step, cosmology=self.cosmology,
-                                  wave_grid=self.wave_grid_rest)
+        if (self.stellar_type == 'PEGASE'):
+            self.stars = PEGASEModel(self.filter_labels, self.redshift, age=self.ages,
+                                      Z_met=0.020, step=step, cosmology=self.cosmology,
+                                      wave_grid=self.wave_grid_rest)
+        elif (self.stellar_type == 'BPASS'):
+            self.stars = BPASSModel(self.filter_labels, self.redshift, age=self.ages,
+                                    Z_met=0.020, step=step, cosmology=self.cosmology,
+                                    wave_grid=self.wave_grid_rest)
+        else:
+            raise ValueError("Stellar type '%s' not understood." % (self.stellar_type))
 
+        # If we don't have an age grid yet, take it
+        # from the SPS model.
         if self.ages is None:
             self.ages = self.stars.age
             self.Nages = len(self.Nages)
@@ -567,7 +585,7 @@ class Lightning:
             self.sfh = SingleExponentialSFH(self.ages)
             #step=False
         else:
-            raise ValueError("SFH type (%s) not understood." % (self.SFH_type))
+            raise ValueError("SFH type '%s' not understood." % (self.SFH_type))
 
 
 
@@ -663,7 +681,7 @@ class Lightning:
 
         if (verbose):
             for mod in self.model_components:
-                if (mod is not None):
+                if (mod is not None) and (mod.Nparams != 0):
                     print('')
                     print('============================')
                     print(mod.model_name)
@@ -677,7 +695,7 @@ class Lightning:
                     ascii.write(mod_table, format='fixed_width_two_line')
         else:
             for mod in self.model_components:
-                if (mod is not None):
+                if (mod is not None) and (mod.Nparams != 0):
                     print(mod.param_names)
 
         print('')
@@ -698,6 +716,11 @@ class Lightning:
 
         sfh_params = params[:, 0:self.sfh.Nparams]
         i = self.sfh.Nparams
+        if (self.stars.Nparams != 0):
+            stellar_params = params[:,i:i + self.stars.Nparams]
+            i += self.stars.Nparams
+        else:
+            stellar_params = None
         if (self.atten is not None):
             atten_params = params[:,i:i + self.atten.Nparams]
             i += self.atten.Nparams
@@ -736,7 +759,7 @@ class Lightning:
         #   in there.
         # Is that slow? This is going to be a function that we call on every model
         # evaluation.
-        return sfh_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params
+        return sfh_params, stellar_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params
 
 
     def get_model_lnu_hires(self, params, stepwise=False):
@@ -776,7 +799,7 @@ class Lightning:
         #Nsteps = sfh_shape[1]
         Nparams = param_shape[1]
 
-        sfh_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = self._separate_params(params)
+        sfh_params, stellar_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = self._separate_params(params)
 
         # exptau = modified_calzetti(self.wave_grid_rest, params[:,0], params[:,1], np.zeros(Nmodels)) # ndarray(Nmodels, len(self.wave_grid_rest))
         # exptau_youngest = modified_calzetti(self.wave_grid_rest, params[:,0], params[:,1], params[:,2])
@@ -790,6 +813,7 @@ class Lightning:
 
         lnu_stellar_attenuated, lnu_stellar_unattenuated, L_TIR_stellar = self.stars.get_model_lnu_hires(self.sfh,
                                                                                                          sfh_params,
+                                                                                                         params=stellar_params,
                                                                                                          exptau=expminustau,
                                                                                                          stepwise=False)
 
@@ -855,7 +879,7 @@ class Lightning:
         Nmodels = param_shape[0]
         Nparams = param_shape[1]
 
-        sfh_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = self._separate_params(params)
+        sfh_params, stellar_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = self._separate_params(params)
 
         lnu_xray_unabs = np.zeros((Nmodels, len(self.xray_wave_grid_rest)))
         lnu_xray_abs = np.zeros((Nmodels, len(self.xray_wave_grid_rest)))
@@ -949,7 +973,7 @@ class Lightning:
         # exptau = modified_calzetti(self.wave_grid_rest, params[:,0], params[:,1], np.zeros(Nmodels)) # ndarray(Nmodels, len(self.wave_grid_rest))
         # exptau_youngest = modified_calzetti(self.wave_grid_rest, params[:,0], params[:,1], params[:,2])
 
-        sfh_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = self._separate_params(params)
+        sfh_params, stellar_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = self._separate_params(params)
 
         expminustau = self.atten.evaluate(atten_params)
 
@@ -961,6 +985,7 @@ class Lightning:
 
         lnu_stellar_attenuated, lnu_stellar_unattenuated, L_TIR_stellar = self.stars.get_model_lnu_hires(self.sfh,
                                                                                                          sfh_params,
+                                                                                                         params=stellar_params,
                                                                                                          exptau=expminustau,
                                                                                                          stepwise=False)
 
@@ -1117,7 +1142,7 @@ class Lightning:
         Nmodels = param_shape[0]
         Nparams = param_shape[1]
 
-        sfh_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = self._separate_params(params)
+        sfh_params, stellar_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = self._separate_params(params)
 
         lnu_xray_unabs = np.zeros((Nmodels, len(self.filter_labels)))
         lnu_xray_abs = np.zeros((Nmodels, len(self.filter_labels)))
@@ -1198,7 +1223,7 @@ class Lightning:
         Nmodels = param_shape[0]
         Nparams = param_shape[1]
 
-        sfh_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = self._separate_params(params)
+        sfh_params, stellar_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = self._separate_params(params)
 
         #counts_xray_unabs = np.zeros((Nmodels, len(self.filter_labels)))
         counts_xray_abs = np.zeros((Nmodels, len(self.filter_labels)))
@@ -1444,13 +1469,13 @@ class Lightning:
 
         ob_mask = np.full((Nmodels, len(self.model_components)), False)
 
-        sfh_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = self._separate_params(params)
+        sfh_params, stellar_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = self._separate_params(params)
 
-        p = [sfh_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params]
+        p = [sfh_params, stellar_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params]
 
         for i in np.arange(len(self.model_components)):
             mod = self.model_components[i]
-            if mod is not None:
+            if (mod is not None) and (mod.Nparams != 0):
                 ob_mask[:,i] = np.any(mod._check_bounds(p[i]), axis=1)
 
         return np.any(ob_mask, axis=1)
@@ -1602,7 +1627,7 @@ class Lightning:
             start = 0
             for i in np.arange(len(self.model_components)):
                 mod = self.model_components[i]
-                if mod is not None:
+                if (mod is not None) and (mod.Nparams != 0):
                     end = start + mod.Nparams
                     param_bounds = mod.param_bounds
                     default_bounds[start:end, :] = param_bounds
@@ -1813,6 +1838,7 @@ class Lightning:
                 'flux_obs': self._flux_obs.tolist() if self._flux_obs is not None else None,
                 'flux_obs_unc': self._flux_unc.tolist() if self._flux_unc is not None else None,
                 'wave_grid': self.wave_grid_rest.tolist(),
+                'stellar_type': self.stellar_type,
                 'SFH_type': self.SFH_type,
                 'ages': self.ages.tolist(),
                 'atten_type': self.atten_type,
@@ -1871,6 +1897,7 @@ class Lightning:
                         flux_obs=config['flux_obs'],
                         flux_obs_unc=config['flux_obs_unc'],
                         wave_grid=np.array(config['wave_grid']),
+                        stellar_type=config['stellar_type'],
                         SFH_type=config['SFH_type'],
                         ages=np.array(config['ages']),
                         atten_type=config['atten_type'],

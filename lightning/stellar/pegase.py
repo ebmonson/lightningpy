@@ -265,7 +265,7 @@ class PEGASEModel(BaseEmissionModel):
             self.Lnu_obs = lnu_age
 
 
-    def get_model_lnu_hires(self, sfh, sfh_param, exptau=None, exptau_youngest=None, stepwise=False):
+    def get_model_lnu_hires(self, sfh, sfh_param, params=None, exptau=None, exptau_youngest=None, stepwise=False):
         '''Construct the high-res stellar spectrum.
 
         Given a SFH instance and set of parameters, the corresponding high-resolution spectrum
@@ -277,6 +277,8 @@ class PEGASEModel(BaseEmissionModel):
             Star formation history model.
         sfh_params : np.ndarray, (Nmodels, Nparam) or (Nparam,), float32
             Parameters for the star formation history.
+        params : None
+            Empty placeholder for compatibility.
         exptau : np.ndarray, (Nmodels, Nwave) or (Nwave,), float32
             ``exp(-tau)`` as a function of wavelength. If this is 2D, the
             size of the first dimension must match the size of the first
@@ -381,7 +383,7 @@ class PEGASEModel(BaseEmissionModel):
             return lnu_attenuated, lnu_unattenuated, L_TIR
 
 
-    def get_model_lnu(self, sfh, sfh_param, exptau=None, exptau_youngest=None, stepwise=False):
+    def get_model_lnu(self, sfh, sfh_param, params=None, exptau=None, exptau_youngest=None, stepwise=False):
         '''Construct the stellar SED as observed in the given filters.
 
         Given a SFH instance and set of parameters, the corresponding high-resolution spectrum
@@ -394,6 +396,8 @@ class PEGASEModel(BaseEmissionModel):
             Star formation history model.
         sfh_params : np.ndarray, (Nmodels, Nparam) or (Nparam,), float32
             Parameters for the star formation history.
+        params : None
+            Empty placeholder for compatibility.
         exptau : np.ndarray, (Nmodels, Nwave) or (Nwave,), float32
             ``exp(-tau)`` as a function of wavelength. If this is 2D, the
             size of the first dimension must match the size of the first
@@ -495,7 +499,7 @@ class PEGASEModel(BaseEmissionModel):
 
             return lmod_attenuated, lmod_unattenuated, L_TIR
 
-    def get_model_lines(self, sfh, sfh_param, stepwise=False):
+    def get_model_lines(self, sfh, sfh_param, params=None, stepwise=False):
 
         if (len(sfh_param.shape) == 1):
             sfh_param = sfh_param.reshape(1, -1)
