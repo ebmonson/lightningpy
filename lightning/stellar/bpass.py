@@ -38,10 +38,7 @@ class BPASSModel(BaseEmissionModel):
           formation in a specified set of stellar age bins. These models are
           integrated from the above.
 
-    Nebular extinction + continuum are included by default.
-
-    NOTE: logU is fixed at -1 in the CSP functions get_model_lnu and get_model_lnu_hires
-          right now, just to make things simpler while I'm implementing.
+    Nebular extinction, lines, and continuum are included by default.
 
     Parameters
     ----------
@@ -58,11 +55,14 @@ class BPASSModel(BaseEmissionModel):
     Z_met : {1e-5, 1e-4, 0.001, 0.002, 0.003, 0.004, 0.008, 0.010, 0.014, 0.020, 0.030, 0.040}
         The metallicity of the stellar model. For the Pégase models, only the above metallicities
         are available.
+    binaries : bool
+        If ``True``, the spectra include the effects of binary stellar evolution. If ``False``, the nebular model
+        cannot be applied (and as a result the ``dust_grains`` switch has no effect).
     nebular_effects : bool
         If ``True``, the spectra at ages <1e7.5 years will include nebular extinction, continua, and lines.
     dust_grains : bool
         If ``True``, the Cloudy models include the effects of dust grain depletion. This option has no effect
-        unless ``nebular_effects`` is True. By default, we set this option to False, for parity with the treatment
+        unless ``nebular_effects`` is True. By default, we set this option to ``False``, for parity with the treatment
         of nebular emission in the Pégase stellar population models.
     wave_grid : np.ndarray, (Nwave,), float, optional
         If set, the spectra are interpreted to this wavelength grid.
@@ -95,7 +95,9 @@ class BPASSModel(BaseEmissionModel):
     model_type = 'Stellar-Emission'
     gridded = False
 
-    def _construct_model(self, age=None, step=True, Z_met=0.020, wave_grid=None, cosmology=None, nebular_effects=True, dust_grains=False):
+    def _construct_model(self, age=None, step=True, Z_met=0.020,
+                         wave_grid=None, cosmology=None, binaries=True,
+                         nebular_effects=True, dust_grains=False):
         '''
             Load the appropriate models from the BPASS h5 hiles and either integrate
             them in bins (if ``step==True``) or interpolate them to an age grid otherwise.
@@ -113,6 +115,8 @@ class BPASSModel(BaseEmissionModel):
         else:
             Z_str = '%03d' % (1000 * Z_met)
 
+        if (nebular_effects) and (not binaries):
+            raise ValueError('Binaries are required to use the Cloudy nebular emission grids.')
 
         if (dust_grains):
             self.path_to_models = self.path_to_models + 'BPASS_Cloudy/imf_135_300/' + 'BPASS_imf135_300_z%s_bin_gr.h5' % (Z_str)
@@ -172,7 +176,10 @@ class BPASSModel(BaseEmissionModel):
             self.param_names_fncy = [r'$\log \mathcal{U}$']
             self.param_bounds = np.array([-4, -1]).reshape(1,2)
         else:
-            lnu_model = f['spec_noneb'][:,:].T
+            if (not binaries):
+                lnu_model = f['spec_noneb_sin'][:,:].T
+            else:
+                lnu_model = f['spec_noneb'][:,:].T
             llines = np.zeros((len(time), len(self.line_names)))
             self.nebular = False
 
@@ -262,14 +269,19 @@ class BPASSModel(BaseEmissionModel):
                 #     mstar_age[i] += mstar[indexof] * deltat_partial
                 #     lnu_age[i,...] += lnu_obs[indexof,...] * deltat_partial
 
+                # tf and ti are the limits of integration, time_lo and time_hi are the limits of the source bins.
                 fullbins = (time_hi < tf) & (time_lo >= ti)
                 partialbinlo = ((time_lo < ti) & (time_hi >= ti))
                 partialbinhi = ((time_lo < tf) & (time_hi >= tf))
                 q0_age[i] = np.sum(q0[fullbins] * deltat[fullbins])
                 lbol_age[i] = np.sum(lbol[fullbins] * deltat[fullbins])
                 mstar_age[i] = np.sum(mstar[fullbins] * deltat[fullbins])
-                lnu_age[i,...] = np.squeeze(np.sum(np.atleast_3d(lnu_obs[fullbins,...]) * deltat[fullbins,None,None], axis=0))
-                if nebular_effects: llines_age[i,...] = np.squeeze(np.sum(np.atleast_3d(llines[fullbins,...]) * deltat[fullbins,None,None], axis=0))
+                # lnu_age[i,...] = np.squeeze(np.sum(np.atleast_3d(lnu_obs[fullbins,...]) * deltat[fullbins,None,None], axis=0))
+                if nebular_effects:
+                    llines_age[i,...] = np.sum(llines[fullbins,...] * deltat[fullbins,None,None], axis=0)
+                    lnu_age[i,...] = np.sum(lnu_obs[fullbins,...] * deltat[fullbins,None,None], axis=0)
+                else:
+                    lnu_age[i,...] = np.sum(lnu_obs[fullbins,...] * deltat[fullbins,None], axis=0)
 
                 if np.any(partialbinlo):
                     deltat_partial = time_hi[partialbinlo] - ti
@@ -277,14 +289,17 @@ class BPASSModel(BaseEmissionModel):
                     lbol_age[i] += lbol[partialbinlo] * deltat_partial
                     mstar_age[i] += mstar[partialbinlo] * deltat_partial
                     lnu_age[i,...] += np.squeeze(lnu_obs[partialbinlo,...] * deltat_partial)
-                    if nebular_effects: llines_age[i,...] += np.squeeze(llines[partialbinlo,...] * deltat_partial)
+                    if nebular_effects:
+                        llines_age[i,...] += np.squeeze(llines[partialbinlo,...] * deltat_partial)
                 if np.any(partialbinhi):
                     deltat_partial = tf - time_lo[partialbinhi]
                     q0_age[i] += q0[partialbinhi] * deltat_partial
                     lbol_age[i] += lbol[partialbinhi] * deltat_partial
                     mstar_age[i] += mstar[partialbinhi] * deltat_partial
                     lnu_age[i,...] += np.squeeze(lnu_obs[partialbinhi,...] * deltat_partial)
-                    if nebular_effects: llines_age[i,...] += np.squeeze(llines[partialbinhi,...] * deltat_partial)
+                    if nebular_effects:
+                        llines_age[i,...] += np.squeeze(llines[partialbinhi,...] * deltat_partial)
+
         else:
 
             Nages = len(self.age)
