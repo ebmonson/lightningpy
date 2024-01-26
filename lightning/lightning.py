@@ -1856,6 +1856,15 @@ class Lightning:
         with open(fname, 'r') as f:
             config = json.load(f)
 
+        # print(config['redshift'])
+        # print(config['ages'])
+
+        ages = np.array(config['ages'])
+        # If the end of the last bin is the age of the universe,
+        # numerical noise can scatter the last bin older than allowed.
+        # Really these should all be ints anyway.
+        ages[-1] = np.floor(ages[-1])
+
         lgh = Lightning(config['filter_labels'],
                         redshift=config['redshift'],
                         lum_dist=config['lum_dist'],
@@ -1863,7 +1872,7 @@ class Lightning:
                         flux_obs_unc=config['flux_obs_unc'],
                         wave_grid=np.array(config['wave_grid']),
                         SFH_type=config['SFH_type'],
-                        ages=np.array(config['ages']),
+                        ages=ages,
                         atten_type=config['atten_type'],
                         dust_emission=config['dust_emission'],
                         agn_emission=config['agn_emission'],
