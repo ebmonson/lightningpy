@@ -1,5 +1,11 @@
 # plightning
 
+> [!Note]
+>
+> The full set of BPASS+Cloudy models is not included in this repo at the moment;
+> they're still ~1.6 GB because I haven't decided how to cut down the wavelength grid yet.
+> Message me and I'll send you a tarball.
+
 python prototype of the Lightning SED fitting code.
 
 Keep in mind that everything here is not necessarily *right* or produced according to best practices. Yet.

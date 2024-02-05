@@ -329,9 +329,9 @@ class PiecewiseConstSFH:
         summand = np.swapaxes(self.multiply(params, arr), 0, 1)
 
         if (cumulative):
-            res = np.cumsum(summand, axis=0).T
+            res = np.nancumsum(summand, axis=0).T
         else:
-            res = np.sum(summand, axis=0)
+            res = np.nansum(summand, axis=0)
 
         if (Nmodels == 1):
             res = res.squeeze(axis=0)

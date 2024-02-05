@@ -83,18 +83,28 @@ class PEGASEModel(BaseEmissionModel):
     model_type = 'Stellar-Emission'
     gridded = False
 
+    Nparams = 1
+    param_names = ['Zmet']
+    param_descr = ['Metallicity (mass fraction, where solar = 0.020)']
+    param_names_fncy = [r'$Z$']
+    param_bounds = np.array([0.001, 0.100]).reshape(1,2)
+
     def _construct_model(self, age=None, step=True, Z_met=0.020, wave_grid=None, cosmology=None, nebular_effects=True):
         '''
             Load the appropriate models from the IDL files Rafael creates and either integrate
             them in bins (if ``step==True``) or interpolate them to an age grid otherwise.
         '''
 
-        if (nebular_effects):
-            self.path_to_models = self.path_to_models + '04-single_burst/Kroupa01/' + 'Kroupa01_Z%5.3f_nebular_spec.idl' % (Z_met)
-        else:
-            self.path_to_models = self.path_to_models + '04-single_burst/Kroupa01/' + 'Kroupa01_Z%5.3f_spec.idl' % (Z_met)
+        Zgrid = [0.001, 0.004, 0.008, 0.013, 0.016, 0.020, 0.050, 0.100]
+        Nmet = len(Zgrid)
+        self.Zmet = Zgrid
 
-        burst_dict = readsav(self.path_to_models)
+        if (nebular_effects):
+            self.path_to_models = [self.path_to_models + '04-single_burst/Kroupa01/' + 'Kroupa01_Z%5.3f_nebular_spec.idl' % (Z_met) for Z_met in Zgrid]
+        else:
+            self.path_to_models = [self.path_to_models + '04-single_burst/Kroupa01/' + 'Kroupa01_Z%5.3f_spec.idl' % (Z_met) for Z_met in Zgrid]
+
+        burst_dict = readsav(self.path_to_models[0]) # Read in the first file to get the ages, wavelength, etc.
 
         if cosmology is None:
             from astropy.cosmology import FlatLambdaCDM
@@ -123,29 +133,21 @@ class PEGASEModel(BaseEmissionModel):
         wave_model = burst_dict['wave'] # Wavelength grid, rest frame
         nu_model = burst_dict['nu'] # Freq grid, rest frame
         time = burst_dict['time'] # Time grid
-        # lnu_model is more convenient if it's assignable, so we'll make
-        # a copy.
-        lnu_model = np.array(burst_dict['lnu']) # Lnu[wave, time] (rest frame)
-        # wave_lines = burst_dict['wlines'] # Wavelength of lines
-        # l_lines = burst_dict['l_lines'] # Integrated luminosity of lines
 
-        mstar = burst_dict['mstars'] # Stellar mass
-        q0 = burst_dict['nlyc'] # Number of lyman continuum photons
-        lbol = burst_dict['lbol'] # Bolometric luminosity
+        lnu_model = np.zeros((Nmet, len(wave_model), len(time)))
+        mstar = np.zeros((Nmet, len(time)))
+        q0 = np.zeros((Nmet, len(time)))
+        lbol = np.zeros((Nmet, len(time)))
+        lnu_lines = np.zeros_like(lnu_model)
 
-        wave_model_obs = wave_model * (1 + self.redshift)
-        nu_model_obs = nu_model / (1 + self.redshift)
-
-        # Handle emission lines: Add a narrow gaussian
-        # to the model at the location of each line
         dv = 50 * u.km / u.s
-        z = (dv / const.c.to(u.km / u.s)).value
+        zlines = (dv / const.c.to(u.km / u.s)).value
 
-        if(nebular_effects):
-            self.nebular = True
-            # Line names aren't given, so we have to
-            # establish them here. We're missing HeII lines,
-            # notabley, along with CIII and SIII
+        lnu_model[0,:,:] = burst_dict['lnu']
+        mstar[0,:] = burst_dict['mstars']
+        q0[0,:] = burst_dict['nlyc']
+        lbol[0,:] = burst_dict['lbol']
+        if nebular_effects:
             line_idcs = {'Ly_A': 29,
                          'OIII1666':46,
                          'CIII1909': 38,
@@ -157,82 +159,171 @@ class PEGASEModel(BaseEmissionModel):
                          'SII6716':53,
                          'SII6730':53,
                          'SIII9068':-4,
-                         'HeI1.083':33
-                         }
-
+                         'HeI1.083':33}
+            self.nebular = True
             Nlines = len(line_idcs)
+            l_lines_strong = np.zeros((Nmet, Nlines, len(time)))
             wave_lines = burst_dict['wlines'] # Wavelength of lines (Nlines,)
-            l_lines = burst_dict['l_lines'] # Integrated luminosity of lines (Nlines, Nages)
+
+            lnu_lines_tmp = np.exp(-1.0 * ((wave_model[:,None] / wave_lines[None,:] - 1) / zlines) ** 2) # (Nwave, Nlines)
+            lnu_lines_tmp /= np.abs(trapz(lnu_lines_tmp, nu_model, axis=0)) # (Nwave, Nlines)
+            lnu_lines[0,:,:] = np.sum(burst_dict['l_lines'][None, :, :] * lnu_lines_tmp[:,:,None], axis=1) # Expand to (Nwave, Nlines, Nage), then sum over lines.
+            l_lines_strong[0,:,:] = burst_dict['l_lines'][np.array(list(line_idcs.values())),:]
             wave_lines_strong = np.array([wave_lines[idx] for idx in line_idcs.values()])
-            l_lines_strong = np.array([l_lines[idx,:] for idx in line_idcs.values()])
-            line_names_strong = list(line_idcs.keys())
+            line_names_strong = np.array(list(line_idcs.keys()))
 
-            # For each timestep...
-            for j,t in enumerate(time):
-                lnu_lines = np.zeros(len(burst_dict['wave']))
-                # For each line...
-                for i,wave in enumerate(wave_lines):
-                    lnu_line = np.exp(-1.0 * (((wave_model / wave) - 1) / z)**2)
-                    lnu_line = lnu_line / np.abs(trapz(lnu_line, nu_model))
-                    lnu_lines = lnu_lines + l_lines[i,j] * lnu_line
+        for i in np.arange(1, len(self.path_to_models)):
 
-                lnu_model[:,j] = lnu_model[:,j] + lnu_lines
+            burst_dict = readsav(self.path_to_models[i])
+
+            lnu_model[i,:,:] = burst_dict['lnu']
+            mstar[i,:] = burst_dict['mstars']
+            q0[i,:] = burst_dict['nlyc']
+            lbol[i,:] = burst_dict['lbol']
+            if nebular_effects:
+                lnu_lines_tmp = np.exp(-1.0 * ((wave_model[:,None] / wave_lines[None,:] - 1) / zlines) ** 2) # (Nwave, Nlines)
+                # In practice this normalization should be sqrt(pi) * lambda * z
+                lnu_lines_tmp /= np.abs(trapz(lnu_lines_tmp, nu_model, axis=0)) # (Nwave, Nlines)
+                lnu_lines[i,:,:] = np.sum(burst_dict['l_lines'][None, :, :] * lnu_lines_tmp[:,:,None], axis=1)
+                l_lines_strong[i,:,:] = burst_dict['l_lines'][np.array(list(line_idcs.values())),:]
+
+        lnu_model += lnu_lines
+            # for j,t in enumerate(time):
+            #     lnu_lines = np.zeros(len(burst_dict['wave']))
+            #     # For each line...
+            #     for i,wave in enumerate(wave_lines):
+            #         lnu_line = np.exp(-1.0 * (((wave_model / wave) - 1) / z)**2)
+            #         lnu_line = lnu_line / np.abs(trapz(lnu_line, nu_model))
+            #         lnu_lines = lnu_lines + l_lines[i,j] * lnu_line
+            #
+            #     lnu_model[:,j] = lnu_model[:,j] + lnu_lines
+
+            # lnu_line = np.exp(-1.0 * (((wave_model / wave_lines) - 1) / z)**2)
+            #
+            # lnu_lines[0,:,:]
+
+        # lnu_model = np.array(burst_dict['lnu']) # Lnu[wave, time] (rest frame)
+        # # wave_lines = burst_dict['wlines'] # Wavelength of lines
+        # # l_lines = burst_dict['l_lines'] # Integrated luminosity of lines
+        #
+        # mstar = burst_dict['mstars'] # Stellar mass
+        # q0 = burst_dict['nlyc'] # Number of lyman continuum photons
+        # lbol = burst_dict['lbol'] # Bolometric luminosity
+
+        wave_model_obs = wave_model * (1 + self.redshift)
+        nu_model_obs = nu_model / (1 + self.redshift)
+
+        # Handle emission lines: Add a narrow gaussian
+        # to the model at the location of each line
+
+
+        # if(nebular_effects):
+        #     self.nebular = True
+        #     # Line names aren't given, so we have to
+        #     # establish them here. We're missing HeII lines,
+        #     # notabley, along with CIII and SIII
+        #     line_idcs = {'Ly_A': 29,
+        #                  'OIII1666':46,
+        #                  'CIII1909': 38,
+        #                  'OII3726':44,
+        #                  'Hbeta':0,
+        #                  'OIII5007': 48,
+        #                  'Halpha':1,
+        #                  'NII6584':42,
+        #                  'SII6716':53,
+        #                  'SII6730':53,
+        #                  'SIII9068':-4,
+        #                  'HeI1.083':33
+        #                  }
+        #
+        #
+        #     Nlines = len(line_idcs)
+        #     wave_lines = burst_dict['wlines'] # Wavelength of lines (Nlines,)
+        #     l_lines = burst_dict['l_lines'] # Integrated luminosity of lines (Nlines, Nages)
+        #     wave_lines_strong = np.array([wave_lines[idx] for idx in line_idcs.values()])
+        #     l_lines_strong = np.array([l_lines[idx,:] for idx in line_idcs.values()])
+        #     line_names_strong = list(line_idcs.keys())
+        #
+        #     # For each timestep...
+        #     for j,t in enumerate(time):
+        #         lnu_lines = np.zeros(len(burst_dict['wave']))
+        #         # For each line...
+        #         for i,wave in enumerate(wave_lines):
+        #             lnu_line = np.exp(-1.0 * (((wave_model / wave) - 1) / z)**2)
+        #             lnu_line = lnu_line / np.abs(trapz(lnu_line, nu_model))
+        #             lnu_lines = lnu_lines + l_lines[i,j] * lnu_line
+        #
+        #         lnu_model[:,j] = lnu_model[:,j] + lnu_lines
 
         lnu_obs = lnu_model * (1 + self.redshift)
+
+        # From here:
+        #  TODO: Add a new dimension to all arrays for metallicity.
 
         if (self.step):
 
             Nbins = len(age) - 1
             self.Nages = Nbins
 
-            q0_age = np.zeros(Nbins, dtype='double') # Ionizing photons per bin
-            lnu_age = np.zeros((Nbins, len(wave_model)), dtype='double') # Lnu(wave) per bin
-            lbol_age = np.zeros(Nbins, dtype='double') # Bolometric luminosity in bin
-            mstar_age = np.zeros(Nbins, dtype='double') # Mass in bin
-            if (nebular_effects): l_lines_age = np.zeros((Nbins, Nlines)) # Integrated line luminosities
+            q0_age = np.zeros((Nbins, Nmet), dtype='double') # Ionizing photons per bin
+            lnu_age = np.zeros((Nbins, Nmet, len(wave_model)), dtype='double') # Lnu(wave) per bin
+            lbol_age = np.zeros((Nbins, Nmet), dtype='double') # Bolometric luminosity in bin
+            mstar_age = np.zeros((Nbins, Nmet), dtype='double') # Mass in bin
+            if (nebular_effects): l_lines_age = np.zeros((Nbins, Nmet, Nlines)) # Integrated line luminosities
 
             #dt = 5.e5 # Time resolution in years
             n_substeps = 100 # number of time divisions -- faster to do it this way, seemingly no loss of accuracy
             #t0 = time_module.time()
             for i in np.arange(Nbins):
+                for j in np.arange(Nmet):
 
-                #if (i == Nbins - 1): dt = 1e6
+                    #if (i == Nbins - 1): dt = 1e6
 
-                ti = age[i]
-                tf = age[i + 1]
-                bin_width = tf - ti
-                #n_substeps = (bin_width // dt) # Number of timesteps in bin
-                dt = bin_width / n_substeps
-                time_substeps = dt * np.arange(n_substeps + 1) # "Time from the onset of SF, progressing linearly"
-                integrate_here = (time_substeps >= 0) & (time_substeps <= bin_width)
-                q0_age[i] = trapz(np.interp(tf - time_substeps, time, q0)[integrate_here], time_substeps[integrate_here])
-                lbol_age[i] = trapz(np.interp(tf - time_substeps, time, lbol)[integrate_here], time_substeps[integrate_here])
-                mstar_age[i] = trapz(np.interp(tf - time_substeps, time, mstar)[integrate_here], time_substeps[integrate_here])
+                    ti = age[i]
+                    tf = age[i + 1]
+                    bin_width = tf - ti
+                    #n_substeps = (bin_width // dt) # Number of timesteps in bin
+                    dt = bin_width / n_substeps
+                    time_substeps = dt * np.arange(n_substeps + 1) # "Time from the onset of SF, progressing linearly"
+                    integrate_here = (time_substeps >= 0) & (time_substeps <= bin_width)
+                    q0_age[i,j] = trapz(np.interp(tf - time_substeps, time, q0[j,:])[integrate_here], time_substeps[integrate_here])
+                    lbol_age[i,j] = trapz(np.interp(tf - time_substeps, time, lbol[j,:])[integrate_here], time_substeps[integrate_here])
+                    mstar_age[i,j] = trapz(np.interp(tf - time_substeps, time, mstar[j,:])[integrate_here], time_substeps[integrate_here])
 
-                # Vectorize later
-                for j in np.arange(len(nu_model_obs)):
-                    lnu_age[i,j] = trapz(np.interp(tf - time_substeps, time, lnu_obs[j,:])[integrate_here], time_substeps[integrate_here])
+                    # Vectorize later
+                    for k in np.arange(len(nu_model_obs)):
+                        lnu_age[i,j,k] = trapz(np.interp(tf - time_substeps, time, lnu_obs[j,k,:])[integrate_here], time_substeps[integrate_here])
 
-                if (nebular_effects):
-                    for j in np.arange(Nlines):
-                        l_lines_age[i,j] = trapz(np.interp(tf - time_substeps, time, l_lines_strong[j,:])[integrate_here], time_substeps[integrate_here])
+                    if (nebular_effects):
+                        for k in np.arange(Nlines):
+                            l_lines_age[i,j,k] = trapz(np.interp(tf - time_substeps, time, l_lines_strong[j,k,:])[integrate_here], time_substeps[integrate_here])
 
         else:
 
             Nages = len(age)
             self.Nages = Nages
 
-            lnu_age = np.zeros((Nages, len(wave_model)), dtype='double') # Lnu(wave)
+            q0_age = np.zeros((Nages, Nmet), dtype='double') # Ionizing photons per bin
+            lnu_age = np.zeros((Nages, Nmet, len(wave_model)), dtype='double') # Lnu(wave) per bin
+            lbol_age = np.zeros((Nages, Nmet), dtype='double') # Bolometric luminosity in bin
+            mstar_age = np.zeros((Nages, Nmet), dtype='double') # Mass in bin
+            lnu_age = np.zeros((Nages, Nmet, len(wave_model)), dtype='double') # Lnu(wave)
+            if (nebular_effects): l_lines_age = np.zeros((Nages, Nmet, Nlines))
 
             #t0 = time_module.time()
+            for j in np.arange(Nmet):
+                q0_age[:,j] = np.interp(age, time, q0[j,:])
+                lbol_age[:,j] = np.interp(age, time, lbol[j,:])
+                mstar_age[:,j] = np.interp(age, time, mstar[j,:])
 
-            q0_age = np.interp(age, time, q0)
-            lbol_age = np.interp(age, time, lbol)
-            mstar_age = np.interp(age, time, mstar)
+                # Vectorize later
+                for k in np.arange(len(nu_model_obs)):
+                    lnu_age[:,j,k] = np.interp(age, time, lnu_obs[k,j,:])
 
-            # Vectorize later
-            for j in np.arange(len(nu_model_obs)):
-                lnu_age[:,j] = np.interp(age, time, lnu_obs[j,:])
+                if (nebular_effects):
+                    for k in np.arange(Nlines):
+                        l_lines_age[:,j,k] = np.interp(age, time, l_lines_strong[k,j,:])
+
 
         #t1 = time_module.time()
 
@@ -247,7 +338,7 @@ class PEGASEModel(BaseEmissionModel):
         c_um = const.c.to(u.micron / u.s).value
 
         if (wave_grid is not None):
-            finterp = interp1d(wave_model, lnu_age, bounds_error=False, fill_value=0.0, axis=1)
+            finterp = interp1d(wave_model, lnu_age, bounds_error=False, fill_value=0.0, axis=-1)
             lnu_age_interp = finterp(wave_grid)
             lnu_age_interp[lnu_age_interp < 0.0] = 0.0
             nu_grid = c_um / wave_grid
@@ -265,7 +356,7 @@ class PEGASEModel(BaseEmissionModel):
             self.Lnu_obs = lnu_age
 
 
-    def get_model_lnu_hires(self, sfh, sfh_param, params=None, exptau=None, exptau_youngest=None, stepwise=False):
+    def get_model_lnu_hires(self, sfh, sfh_param, params, exptau=None, exptau_youngest=None, stepwise=False):
         '''Construct the high-res stellar spectrum.
 
         Given a SFH instance and set of parameters, the corresponding high-resolution spectrum
@@ -335,10 +426,14 @@ class PEGASEModel(BaseEmissionModel):
         # Comes out negative since self.nu_grid_obs is monotonically decreasing.
         #ages_L_TIR = np.abs(trapz(ages_lnu_unattenuated - ages_lnu_attenuated, self.nu_grid_obs, axis=2))
 
+        finterp = interp1d(self.Zmet, np.log10(self.Lnu_obs), axis=1)
+        Lnu_obs = 10**finterp(params.flatten())
+        Lnu_obs = np.swapaxes(Lnu_obs, 0, 1)
+
         # It is sometimes useful to have the spectra evaluated at each stellar age
         if stepwise:
 
-            ages_lnu_unattenuated = sfh.multiply(sfh_param, self.Lnu_obs)
+            ages_lnu_unattenuated = sfh.multiply(sfh_param, Lnu_obs)
             ages_lnu_attenuated = ages_lnu_unattenuated.copy()
             #ages_lnu_attenuated[:,0,:] = ages_lnu_attenuated[:,0,:] * exptau_youngest
             ages_lnu_attenuated = ages_lnu_attenuated * exptau[:,None,:]
@@ -359,7 +454,7 @@ class PEGASEModel(BaseEmissionModel):
                 # lnu_attenuated = np.sum(ages_lnu_attenuated, axis=1)
                 # L_TIR = np.sum(ages_L_TIR, axis=1)
 
-                lnu_unattenuated = sfh.sum(sfh_param, self.Lnu_obs)
+                lnu_unattenuated = sfh.sum(sfh_param, Lnu_obs)
                 # lnu_attenuated = lnu_unattenuated.copy()
                 # lnu_attenuated = lnu_unattenuated * exptau
                 # L_TIR = np.abs(trapz(lnu_unattenuated - lnu_attenuated, self.nu_grid_obs, axis=1))
@@ -369,7 +464,7 @@ class PEGASEModel(BaseEmissionModel):
                 # lnu_attenuated = trapz(ages_lnu_attenuated, self.age, axis=1)
                 # L_TIR = trapz(ages_L_TIR, self.age, axis=1)
 
-                lnu_unattenuated = sfh.integrate(sfh_param, self.Lnu_obs)
+                lnu_unattenuated = sfh.integrate(sfh_param, Lnu_obs)
 
             lnu_attenuated = lnu_unattenuated.copy()
             lnu_attenuated = lnu_unattenuated * exptau
@@ -499,7 +594,7 @@ class PEGASEModel(BaseEmissionModel):
 
             return lmod_attenuated, lmod_unattenuated, L_TIR
 
-    def get_model_lines(self, sfh, sfh_param, params=None, stepwise=False):
+    def get_model_lines(self, sfh, sfh_param, params, stepwise=False):
 
         if (len(sfh_param.shape) == 1):
             sfh_param = sfh_param.reshape(1, -1)
@@ -511,16 +606,19 @@ class PEGASEModel(BaseEmissionModel):
 
         assert (self.nebular), 'Models were created without nebular emission; there are no lines.'
 
+        finterp = interp1d(self.Zmet, np.log10(self.line_lum), axis=1)
+        L_lines = 10**finterp(params.flatten())
+        L_lines = np.swapaxes(L_lines, 0, 1)
 
         if stepwise:
-            ages_Lmod_lines = sfh.multiply(sfh_param, self.line_lum)
+            ages_Lmod_lines = sfh.multiply(sfh_param, L_lines)
 
             return ages_Lmod_lines
 
         else:
             if (self.step):
-                Lmod_lines = sfh.sum(sfh_param, self.line_lum)
+                Lmod_lines = sfh.sum(sfh_param, L_lines)
             else:
-                Lmod_lines = sfh.integrate(sfh_param, self.line_lum)
+                Lmod_lines = sfh.integrate(sfh_param, L_lines)
 
             return Lmod_lines

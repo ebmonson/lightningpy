@@ -12,6 +12,8 @@ testbench.ipynb
 *.pickle
 *.py~
 
+BPASS_imf135_300.tar.gz
+
 lightning/recycling_bin/
 
 docs/build

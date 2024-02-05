@@ -12,7 +12,7 @@ import astropy.constants as const
 from astropy.table import Table
 from astropy.io import ascii
 
-from scipy.interpolate import interp1d
+from scipy.interpolate import interp1d, interpn
 from scipy.integrate import trapz
 from scipy.io import readsav
 
@@ -95,6 +95,12 @@ class BPASSModel(BaseEmissionModel):
     model_type = 'Stellar-Emission'
     gridded = False
 
+    # Nparams = 1
+    # param_names = ['Zmet']
+    # param_descr = ['Metallicity (mass fraction, where solar = 0.020)']
+    # param_names_fncy = [r'$Z$']
+    # param_bounds = np.array([1e-5, 0.040]).reshape(1,2)
+
     def _construct_model(self, age=None, step=True, Z_met=0.020,
                          wave_grid=None, cosmology=None, binaries=True,
                          nebular_effects=True, dust_grains=False):
@@ -105,25 +111,30 @@ class BPASSModel(BaseEmissionModel):
 
         Zgrid = [1e-5, 1e-4, 0.001, 0.002, 0.003, 0.004, 0.008, 0.010, 0.014, 0.020, 0.030, 0.040]
 
-        if (Z_met not in Zgrid):
-            print('BPASS + Cloudy models are only available for Z_met = ')
-            print(Zgrid)
-            raise ValueError('Z_met value not allowed.')
+        self.Zmet = Zgrid
 
-        if (Z_met < 0.001):
-            Z_str = '1em%d' % (-1 * np.log10(Z_met))
-        else:
-            Z_str = '%03d' % (1000 * Z_met)
+        # if (Z_met not in Zgrid):
+        #     print('BPASS + Cloudy models are only available for Z_met = ')
+        #     print(Zgrid)
+        #     raise ValueError('Z_met value not allowed.')
+
+        # if (Z_met < 0.001):
+        #     Z_str = '1em%d' % (-1 * np.log10(Z_met))
+        # else:
+        #     Z_str = '%03d' % (1000 * Z_met)
+
+        Zstr = np.where(np.array(Zgrid) < 0.001, ['em%d' % (-1 * np.log10(Z)) for Z in Zgrid], ['%03d' % (1000 * Z) for Z in Zgrid])
+        # print(Zstr)
 
         if (nebular_effects) and (not binaries):
             raise ValueError('Binaries are required to use the Cloudy nebular emission grids.')
 
         if (dust_grains):
-            self.path_to_models = self.path_to_models + 'BPASS_Cloudy/imf_135_300/' + 'BPASS_imf135_300_z%s_bin_gr.h5' % (Z_str)
+            self.path_to_models = [self.path_to_models + 'BPASS_Cloudy/imf_135_300/' + 'BPASS_imf135_300_z%s_bin_gr.h5' % (s) for s in Zstr]
         else:
-            self.path_to_models = self.path_to_models + 'BPASS_Cloudy/imf_135_300/' + 'BPASS_imf135_300_z%s_bin_ng.h5' % (Z_str)
+            self.path_to_models = [self.path_to_models + 'BPASS_Cloudy/imf_135_300/' + 'BPASS_imf135_300_z%s_bin_ng.h5' % (s) for s in Zstr]
 
-        f = h5py.File(self.path_to_models)
+        f = h5py.File(self.path_to_models[0])
 
         if cosmology is None:
             from astropy.cosmology import FlatLambdaCDM
@@ -159,37 +170,65 @@ class BPASSModel(BaseEmissionModel):
         #Nlines = len(linenames)
         # Our convention here for ease of integration is that the wavelength is the last axis,
         # transposed from the way the models are gridded.
+
+        f.close()
+
+        # mstar = f['mstar'][:] # Stellar mass
+        # q0 = f['q0'][:] # Number of lyman continuum photons
+        # lbol = f['Lbol'][:] # Bolometric luminosity
+        mstar = np.zeros((len(time), len(self.Zmet)))
+        q0 = np.zeros((len(time), len(self.Zmet)))
+        lbol = np.zeros((len(time), len(self.Zmet)))
+
         if (nebular_effects):
-            lnu_model = np.zeros((len(time), len(self.logU), len(wave_model)))
-            llines = np.zeros((len(time), len(self.logU), len(self.line_names)))
-            for j in np.arange(len(self.logU)):
-                lnu_model[:,j,:] = (f['spec_neb/%.1f' % (self.logU[j])][:,:]).T
-                linelum = (f['lines/lum/%.1f' % (self.logU[j])])[:,:]
-                llines[:linelum.shape[0],j,:] = linelum
+            lnu_model = np.zeros((len(time), len(self.Zmet), len(self.logU), len(wave_model)))
+            llines = np.zeros((len(time), len(self.Zmet), len(self.logU), len(self.line_names)))
+            for j in np.arange(len(self.Zmet)):
+                f = h5py.File(self.path_to_models[j])
+                mstar[:,j] = f['mstar'][:]
+                q0[:,j] = f['q0'][:]
+                lbol[:,j] = f['Lbol'][:]
+                for k in np.arange(len(self.logU)):
+                    lnu_model[:,j,k,:] = (f['spec_neb/%.1f' % (self.logU[k])][:,:]).T
+                    linelum = (f['lines/lum/%.1f' % (self.logU[k])])[:,:]
+                    llines[:linelum.shape[0],j,k,:] = linelum
+                f.close()
 
             llines[np.isnan(llines)] = 0.0
 
             self.nebular = True
-            self.Nparams = 1
-            self.param_names = ['logU']
-            self.param_descr = ['log10 of the ionization parameter']
-            self.param_names_fncy = [r'$\log \mathcal{U}$']
-            self.param_bounds = np.array([-4, -1]).reshape(1,2)
+            self.Nparams = 2
+            self.param_names = ['Zmet', 'logU']
+            self.param_descr = ['Metallicity (mass fraction, where solar = 0.020)',
+                                'log10 of the ionization parameter']
+            self.param_names_fncy = [r'$Z$', r'$\log \mathcal{U}$']
+            self.param_bounds = np.array([[1e-5, 0.040],
+                                          [-4, -1]])
+            # print(self.param_bounds)
         else:
-            if (not binaries):
-                lnu_model = f['spec_noneb_sin'][:,:].T
-            else:
-                lnu_model = f['spec_noneb'][:,:].T
-            llines = np.zeros((len(time), len(self.line_names)))
+            lnu_model = np.zeros((len(time), len(self.Zmet), len(wave_model)))
+            for j in np.arange(len(self.Zmet)):
+                f = h5py.File(self.path_to_models[j])
+                mstar[:,j] = f['mstar'][:]
+                q0[:,j] = f['q0'][:]
+                lbol[:,j] = f['Lbol'][:]
+                if (not binaries):
+                    lnu_model[:,j,:] = f['spec_noneb_sin'][:,:].T
+                else:
+                    lnu_model[:,j,:] = f['spec_noneb'][:,:].T
+                f.close()
+            llines = np.zeros((len(time), len(self.Zmet), len(self.line_names)))
             self.nebular = False
+            self.Nparams = 1
+            self.param_names = ['Zmet']
+            self.param_descr = ['Metallicity (mass fraction, where solar = 0.020)']
+            self.param_names_fncy = [r'$Z$']
+            self.param_bounds = np.array([1e-5, 0.040]).reshape(1,2)
 
         #lnu_model = np.array(burst_dict['lnu']) # Lnu[wave, time] (rest frame)
         # wave_lines = burst_dict['wlines'] # Wavelength of lines
         # l_lines = burst_dict['l_lines'] # Integrated luminosity of lines
 
-        mstar = f['mstar'][:] # Stellar mass
-        q0 = f['q0'][:] # Number of lyman continuum photons
-        lbol = f['Lbol'][:] # Bolometric luminosity
 
         wave_model_obs = wave_model * (1 + self.redshift)
         nu_model_obs = nu_model / (1 + self.redshift)
@@ -204,18 +243,18 @@ class BPASSModel(BaseEmissionModel):
                 raise ValueError('The minimum age bin width is 10**6.05 years; this is set by the time resolution of the source models.')
             self.Nages = Nbins
 
-            q0_age = np.zeros(Nbins, dtype='double') # Ionizing photons per bin
+            q0_age = np.zeros((Nbins,len(self.Zmet)), dtype='double') # Ionizing photons per bin
             if (nebular_effects):
-                lnu_age = np.zeros((Nbins, len(self.logU), len(wave_model)), dtype='double') # Lnu(wave) per bin and logU
-                llines_age = np.zeros((Nbins, len(self.logU), len(self.line_names)), dtype='double')
+                lnu_age = np.zeros((Nbins, len(self.Zmet), len(self.logU), len(wave_model)), dtype='double') # Lnu(wave) per bin and logU
+                llines_age = np.zeros((Nbins, len(self.Zmet), len(self.logU), len(self.line_names)), dtype='double')
             else:
-                lnu_age = np.zeros((Nbins, len(wave_model)), dtype='double') # Lnu(wave) per bin
-                llines_age = np.zeros((Nbins, len(self.line_names)))
-            lbol_age = np.zeros(Nbins, dtype='double') # Bolometric luminosity in bin
-            mstar_age = np.zeros(Nbins, dtype='double') # Mass in bin
+                lnu_age = np.zeros((Nbins, len(self.Zmet), len(wave_model)), dtype='double') # Lnu(wave) per bin
+                llines_age = np.zeros((Nbins, len(self.Zmet), len(self.line_names)))
+            lbol_age = np.zeros((Nbins,len(self.Zmet)), dtype='double') # Bolometric luminosity in bin
+            mstar_age = np.zeros((Nbins,len(self.Zmet)), dtype='double') # Mass in bin
 
             #dt = 5.e5 # Time resolution in years
-            n_substeps = 100 # number of time divisions -- faster to do it this way, seemingly no loss of accuracy
+            #n_substeps = 100 # number of time divisions -- faster to do it this way, seemingly no loss of accuracy
             #t0 = time_module.time()
             for i in np.arange(Nbins):
 
@@ -273,29 +312,29 @@ class BPASSModel(BaseEmissionModel):
                 fullbins = (time_hi < tf) & (time_lo >= ti)
                 partialbinlo = ((time_lo < ti) & (time_hi >= ti))
                 partialbinhi = ((time_lo < tf) & (time_hi >= tf))
-                q0_age[i] = np.sum(q0[fullbins] * deltat[fullbins])
-                lbol_age[i] = np.sum(lbol[fullbins] * deltat[fullbins])
-                mstar_age[i] = np.sum(mstar[fullbins] * deltat[fullbins])
+                q0_age[i,:] = np.sum(q0[fullbins,:] * deltat[fullbins,None], axis=0)
+                lbol_age[i,:] = np.sum(lbol[fullbins,:] * deltat[fullbins,None], axis=0)
+                mstar_age[i,:] = np.sum(mstar[fullbins,:] * deltat[fullbins,None], axis=0)
                 # lnu_age[i,...] = np.squeeze(np.sum(np.atleast_3d(lnu_obs[fullbins,...]) * deltat[fullbins,None,None], axis=0))
                 if nebular_effects:
-                    llines_age[i,...] = np.sum(llines[fullbins,...] * deltat[fullbins,None,None], axis=0)
-                    lnu_age[i,...] = np.sum(lnu_obs[fullbins,...] * deltat[fullbins,None,None], axis=0)
+                    llines_age[i,...] = np.sum(llines[fullbins,...] * deltat[fullbins,None,None,None], axis=0)
+                    lnu_age[i,...] = np.sum(lnu_obs[fullbins,...] * deltat[fullbins,None,None,None], axis=0)
                 else:
-                    lnu_age[i,...] = np.sum(lnu_obs[fullbins,...] * deltat[fullbins,None], axis=0)
+                    lnu_age[i,...] = np.sum(lnu_obs[fullbins,...] * deltat[fullbins,None,None], axis=0)
 
                 if np.any(partialbinlo):
                     deltat_partial = time_hi[partialbinlo] - ti
-                    q0_age[i] += q0[partialbinlo] * deltat_partial
-                    lbol_age[i] += lbol[partialbinlo] * deltat_partial
-                    mstar_age[i] += mstar[partialbinlo] * deltat_partial
+                    q0_age[i,:] +=  np.squeeze(q0[partialbinlo,:] * deltat_partial)
+                    lbol_age[i,:] +=  np.squeeze(lbol[partialbinlo,:] * deltat_partial)
+                    mstar_age[i,:] += np.squeeze(mstar[partialbinlo,:] * deltat_partial)
                     lnu_age[i,...] += np.squeeze(lnu_obs[partialbinlo,...] * deltat_partial)
                     if nebular_effects:
                         llines_age[i,...] += np.squeeze(llines[partialbinlo,...] * deltat_partial)
                 if np.any(partialbinhi):
                     deltat_partial = tf - time_lo[partialbinhi]
-                    q0_age[i] += q0[partialbinhi] * deltat_partial
-                    lbol_age[i] += lbol[partialbinhi] * deltat_partial
-                    mstar_age[i] += mstar[partialbinhi] * deltat_partial
+                    q0_age[i,:] += np.squeeze(q0[partialbinhi,:] * deltat_partial)
+                    lbol_age[i,:] += np.squeeze(lbol[partialbinhi,:] * deltat_partial)
+                    mstar_age[i,:] += np.squeeze(mstar[partialbinhi,:] * deltat_partial)
                     lnu_age[i,...] += np.squeeze(lnu_obs[partialbinhi,...] * deltat_partial)
                     if nebular_effects:
                         llines_age[i,...] += np.squeeze(llines[partialbinhi,...] * deltat_partial)
@@ -306,22 +345,21 @@ class BPASSModel(BaseEmissionModel):
             self.Nages = Nages
 
             if (nebular_effects):
-                lnu_age = np.zeros((self.Nages, len(logU), len(wave_model)), dtype='double') # Lnu(wave) per bin and logU
-                llines_age = np.zeros((self.Nages, len(self.logU), len(self.line_names)), dtype='double')
+                lnu_age = np.zeros((self.Nages, len(self.Zmet), len(self.logU), len(wave_model)), dtype='double') # Lnu(wave) per bin and logU
+                llines_age = np.zeros((self.Nages, len(self.Zmet), len(self.logU), len(self.line_names)), dtype='double')
 
             else:
-                lnu_age = np.zeros((self.Nages, len(wave_model)), dtype='double') # Lnu(wave) per bin
-                llines_age = np.zeros((self.Nages, len(self.line_names)))
+                lnu_age = np.zeros((self.Nages, len(self.Zmet), len(wave_model)), dtype='double') # Lnu(wave) per bin
+                llines_age = np.zeros((self.Nages, len(self.Zmet), len(self.line_names)))
 
 
             #t0 = time_module.time()
 
-            q0_age = np.interp(self.age, time, q0)
-            lbol_age = np.interp(self.age, time, lbol)
-            mstar_age = np.interp(self.age, time, mstar)
+            for j in np.arange(len(self.Zmet)):
+                q0_age[:,j] = np.interp(self.age, time, q0[:,j])
+                lbol_age[:,j] = np.interp(self.age, time, lbol[:,j])
+                mstar_age[:,j] = np.interp(self.age, time, mstar[:,j])
 
-            # Vectorize later
-            # This isn't really right
             lnu_finterp = interp1d(time, lnu_obs, axis=0)
             lnu_age = lnu_finterp(self.age)
             # for j in np.arange(len(nu_model_obs)):
@@ -358,9 +396,7 @@ class BPASSModel(BaseEmissionModel):
             self.nu_grid_obs = self.nu_grid_rest * (1 + self.redshift)
             self.Lnu_obs = lnu_age
 
-        f.close()
-
-    def get_model_lnu_hires(self, sfh, sfh_param, params=None, exptau=None, exptau_youngest=None, stepwise=False):
+    def get_model_lnu_hires(self, sfh, sfh_param, params, exptau=None, exptau_youngest=None, stepwise=False):
         '''Construct the high-res stellar spectrum.
 
         Given a SFH instance and set of parameters, the corresponding high-resolution spectrum
@@ -430,17 +466,30 @@ class BPASSModel(BaseEmissionModel):
         if (self.nebular):
             # No boundary handling since we did it above.
             #print('Lnu_obs gridded shape: ', self.Lnu_obs.shape, len(self.Lnu_obs.shape))
-            finterp = interp1d(self.logU, self.Lnu_obs, axis=1)
+            Zmet = params[:,0]
+            logU = params[:,1]
+
+            Lnu_obs = 10**interpn((self.Zmet, self.logU),
+                                   np.log10(np.transpose(self.Lnu_obs, axes=[1,2,0,3])),
+                                   params,
+                                   method='linear')
+
+            #finterp = interp1d(self.logU, self.Lnu_obs, axis=1)
             # Lnu_obs = finterp(params)
             # # params comes in as (Nmodels, 1) so Lnu_obs will have shape ()
             # if len(Lnu_obs.shape) > 3:
             #     Lnu_obs = np.squeeze(Lnu_obs, axis=2)
-            Lnu_obs = finterp(params.flatten())
+            #Lnu_obs = finterp(params.flatten())
             #Lnu_obs = np.squeeze(finterp(params)) # (Nages, Nmodels, Nwave)
             #print('Lnu_obs shape after interpolation: ', Lnu_obs.shape, len(Lnu_obs.shape))
-            Lnu_obs = np.swapaxes(Lnu_obs, 0, 1) # (Nmodels, Nages, Nwave)
+            #Lnu_obs = np.swapaxes(Lnu_obs, 0, 1) # (Nmodels, Nages, Nwave)
         else:
-            Lnu_obs = self.Lnu_obs # (Nages, Nwave)
+            # We need only interpolate in the metallicity dimension.
+            finterp = interp1d(self.Zmet, np.log10(self.Lnu_obs), axis=1)
+            Lnu_obs = 10**finterp(params.flatten())
+            Lnu_obs = np.swapaxes(Lnu_obs, 0, 1)
+
+            Lnu_obs = self.Lnu_obs # (Nmodels, Nages, Nwave)
 
         # It is sometimes useful to have the spectra evaluated at each stellar age
         if stepwise:
@@ -608,9 +657,18 @@ class BPASSModel(BaseEmissionModel):
         assert (self.nebular), 'Models were created without nebular emission; there are no lines.'
         assert (params.shape[0] == Nmodels), 'First dimension of logU array must match first dimension of SFH.'
 
-        finterp = interp1d(self.logU, self.line_lum, axis=1)
-        L_lines = finterp(params.flatten()) # (Nages, Nmodels, Nlines)
-        L_lines = np.swapaxes(L_lines, 0, 1) # (Nmodels, Nages, Nlines)
+        #print(self.line_lum)
+        L_lines = 10**interpn((self.Zmet, self.logU),
+                             np.log10(np.transpose(self.line_lum, axes=[1,2,0,3])),
+                             params,
+                             method='linear')
+        #print(L_lines)
+        # Send the originally 0 luminosities made NaN by log interpolation back to 0.
+        L_lines[np.isnan(L_lines)] = 0
+
+        # finterp = interp1d(self.logU, self.line_lum, axis=1)
+        # L_lines = finterp(params.flatten()) # (Nages, Nmodels, Nlines)
+        #L_lines = np.swapaxes(L_lines, 0, 1) # (Nmodels, Nages, Nlines)
 
         if stepwise:
             ages_Lmod_lines = sfh.multiply(sfh_param, L_lines)
