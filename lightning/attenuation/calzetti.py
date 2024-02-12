@@ -1,9 +1,6 @@
 '''
     Base Calzetti attenuation and the modified Calzetti attenuation from
     Noll et al. (2009).
-
-    TODO:
-    - Update extrapolation of Calzetti curves to new method
 '''
 
 import numpy as np
@@ -12,6 +9,7 @@ from .base import AnalyticAtten
 class CalzettiAtten(AnalyticAtten):
     '''
     Featureless Calzetti+(2000) attenuation curve.
+    Linearly extrapolated from 1200 Å down to 912 Å.
     '''
 
     type = 'analytic'
@@ -39,9 +37,9 @@ class CalzettiAtten(AnalyticAtten):
         Model includes a featureless Calzetti law.
         '''
 
-        klam = np.zeros_like(self.wave) # k_lambda, the opacity as a function of wavelength?
+        klam = np.zeros_like(self.wave) # k_lambda, the opacity as a function of wavelength
         flam1 = np.zeros_like(self.wave)
-        flam2 = np.zeros_like(self.wave)
+        #flam2 = np.zeros_like(self.wave)
 
         # Different in this case since there is only one parameter
         if (len(params.shape) == 1):
@@ -59,17 +57,22 @@ class CalzettiAtten(AnalyticAtten):
 
         RV = 4.05
 
-        # Calzetti curve extrapolated from 0.01 to 5.0 microns
-        # originally derived from 0.0912 to 2.2 microns
         w1 = (self.wave >= 0.6300) & (self.wave <= 2.2000)
         w2 = (self.wave >= 0.0912) & (self.wave <= 0.6300)
-        w3 = (self.wave < 0.0912) & (self.wave > 2.2000)
+        # w3 = (self.wave < 0.0912) & (self.wave > 2.2000)
+        w3 = (self.wave >= 0.0912) & (self.wave < 0.1200)
+        w4 = (self.wave > 2.2000)
+
+        slope = -92.449445 # polynomial slope at 0.1200 um
+        value =  12.119377 # polynomial value at 0.1200 um
 
         kk = 1./self.wave
 
         klam[w1] = 2.659 * (-1.857 + 1.040 * kk[w1]) + RV
         klam[w2] = 2.659 * np.polynomial.Polynomial([-2.156, 1.509, -0.198, 0.011])(kk[w2]) + RV
-        klam[w3] = 0.0
+        # Linearly extrapolate from 0.1200 to 0.0912 um as in Noll+(2009), rather than polynomial extrapolation
+        klam[w3] = slope * self.wave[w3] + (value - slope * 0.1200)
+        klam[w4] = 0.0
 
         flam1 = klam[None,:] / 4.05
 
@@ -86,6 +89,7 @@ class ModifiedCalzettiAtten(AnalyticAtten):
     '''
     The Noll+(2009) modification of the Calzetti+(2000) attenuation curve,
     including a Drude-profile bump at 2175 Å and a variable UV slope.
+    Linearly extrapolated from 1200 Å down to 912 Å.
     '''
 
     type = 'analytic'
@@ -152,24 +156,26 @@ class ModifiedCalzettiAtten(AnalyticAtten):
         # Modifications as in Noll et al. 2009
         Dlam = (0.85 - 1.9 * delta[:,None]) / (((self.wave[None,:]**2 - lam0_bump**2) / (self.wave[None,:] * FWHM_bump))**2 + 1.)
 
-        # Calzetti curve extrapolated from 0.01 to 5.0 microns
-        # originally derived from 0.0912 to 2.2 microns
         w1 = (self.wave >= 0.6300) & (self.wave <= 2.2000)
         w2 = (self.wave >= 0.0912) & (self.wave <= 0.6300)
-        w3 = (self.wave < 0.0912) & (self.wave > 2.2000)
+        #w3 = (self.wave < 0.0912) & (self.wave > 2.2000)
+        w3 = (self.wave >= 0.0912) & (self.wave < 0.1200)
+        w4 = (self.wave > 2.2000)
+
+        slope = -92.449445 # polynomial slope at 0.1200 um
+        value =  12.119377 # polynomial value at 0.1200 um
 
         kk = 1./self.wave
 
         klam[w1] = 2.659 * (-1.857 + 1.040 * kk[w1]) + RV
         klam[w2] = 2.659 * np.polynomial.Polynomial([-2.156, 1.509, -0.198, 0.011])(kk[w2]) + RV
-        klam[w3] = 0.0
+        # Linearly extrapolate from 0.1200 to 0.0912 um as in Noll+(2009), rather than polynomial extrapolation
+        klam[w3] = slope * self.wave[w3] + (value - slope * 0.1200)
+        klam[w4] = 0.0
 
         flam1 = (klam[None,:] + Dlam) / 4.05 * (self.wave[None,:] / 0.55)**delta[:,None]
 
-        # if (tauV_BC != 0):
-        #     flam2  = 0.55 / wave # For birth cloud attenuation, somehow
-        #
-
+        # Birth cloud component propto 1 / lambda
         flam2  = 0.55 / self.wave
 
         expminustau = np.exp(-1*tauV_diff[:,None] * flam1 + -1*tauV_BC[:,None] * flam2[None,:])
