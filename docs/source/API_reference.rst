@@ -14,3 +14,5 @@ API Reference
    api/stellar
    api/dust
    api/priors
+   api/plots
+   api/postprocessing

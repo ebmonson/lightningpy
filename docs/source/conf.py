@@ -18,7 +18,7 @@
 # -- Project information -----------------------------------------------------
 
 project = 'plightning'
-copyright = '2023, Erik B. Monson'
+copyright = '2023-2024, Erik B. Monson'
 author = 'Erik B. Monson'
 
 # The full version, including alpha/beta/rc tags
@@ -53,7 +53,8 @@ exclude_patterns = []
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'sphinx_rtd_theme'
+# html_theme = 'sphinx_rtd_theme'
+html_theme = 'alabaster'
 html_theme_options = {'home_page_in_toc': True}
 
 # Automatically extract typehints when specified and place them in

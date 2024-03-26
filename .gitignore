@@ -13,7 +13,10 @@ testbench.ipynb
 *.py~
 
 BPASS_imf135_300.tar.gz
+BPASS_imf_chab300_fullgrid_ng.h5*
 
 lightning/recycling_bin/
 
 docs/build
+
+IZw18*

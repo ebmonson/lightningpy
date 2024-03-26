@@ -89,7 +89,7 @@ class PEGASEModel(BaseEmissionModel):
     param_names_fncy = [r'$Z$']
     param_bounds = np.array([0.001, 0.100]).reshape(1,2)
 
-    def _construct_model(self, age=None, step=True, Z_met=0.020, wave_grid=None, cosmology=None, nebular_effects=True):
+    def _construct_model(self, age=None, step=True, wave_grid=None, cosmology=None, nebular_effects=True):
         '''
             Load the appropriate models from the IDL files Rafael creates and either integrate
             them in bins (if ``step==True``) or interpolate them to an age grid otherwise.
@@ -126,7 +126,7 @@ class PEGASEModel(BaseEmissionModel):
         assert (~np.any(self.age > univ_age)), 'The provided ages cannot exceed the age of the Universe at z.'
 
         self.step = step
-        self.metallicity = Z_met
+        #self.metallicity = Z_met
 
         # These are views into the original dict and so
         # are read-only.

@@ -32,7 +32,7 @@ from astropy.io import ascii
 # Lightning
 from .sfh import PiecewiseConstSFH, DelayedExponentialSFH, SingleExponentialSFH
 #from .sfh.delayed_exponential import
-from .stellar import PEGASEModel, BPASSModel
+from .stellar import PEGASEModel, BPASSModel, BPASSModelA24
 from .dust import DL07Dust as DustModel # Move inside setup function where needed?
 from .agn import AGNModel # Move inside setup function where needed?
 from .xray import StellarPlaw, AGNPlaw, Qsosed
@@ -70,7 +70,7 @@ class Lightning:
     wave_grid : tuple (3,), or np.ndarray, (Nwave,), float32, optional
         Either a tuple specifying a log-spaced wavelength grid, or an array
         giving the wavelengths.
-    stellar_type : {'PEGASE', 'BPASS'}
+    stellar_type : {'PEGASE', 'BPASS', 'BPASS-A24'}
         String specifying the simple stellar population models to use.
     SFH_type : {'Piecewise-Constant', 'Delayed-Exponential'}
         String specifying the SFH type to use.
@@ -142,6 +142,7 @@ class Lightning:
                  flux_obs=None, flux_obs_unc=None,
                  wave_grid=(0.1, 1000, 1200),
                  stellar_type='PEGASE',
+                 nebula_lognH=2.0,
                  SFH_type='Piecewise-Constant', ages=None,
                  atten_type='Modified-Calzetti',
                  dust_emission=False,
@@ -324,13 +325,13 @@ class Lightning:
 
                 self.Nages = len(self.ages)
 
-        allowed_stars = ['PEGASE', 'BPASS']
+        allowed_stars = ['PEGASE', 'BPASS', 'BPASS-A24']
         if stellar_type not in allowed_stars:
             print('Allowed simple stellar population models are:', allowed_stars)
             raise ValueError("Stellar type '%s' not understood." % (stellar_type))
         else:
             self.stellar_type = stellar_type
-            self._setup_stellar()
+            self._setup_stellar(nebula_lognH)
 
         t3 = time.time()
 
@@ -551,7 +552,7 @@ class Lightning:
             self.wave_obs[i] = lam
 
 
-    def _setup_stellar(self):
+    def _setup_stellar(self, nebula_lognH):
         '''
         Initialize SFH model and stellar population.
         '''
@@ -560,12 +561,17 @@ class Lightning:
 
         if (self.stellar_type == 'PEGASE'):
             self.stars = PEGASEModel(self.filter_labels, self.redshift, age=self.ages,
-                                      Z_met=0.020, step=step, cosmology=self.cosmology,
-                                      wave_grid=self.wave_grid_rest)
+                                     step=step, cosmology=self.cosmology,
+                                     wave_grid=self.wave_grid_rest)
         elif (self.stellar_type == 'BPASS'):
             self.stars = BPASSModel(self.filter_labels, self.redshift, age=self.ages,
-                                    Z_met=0.020, step=step, cosmology=self.cosmology,
+                                    step=step, cosmology=self.cosmology,
                                     wave_grid=self.wave_grid_rest)
+        elif (self.stellar_type == 'BPASS-A24'):
+            self.stars = BPASSModelA24(self.filter_labels, self.redshift, age=self.ages,
+                                       step=step, cosmology=self.cosmology,
+                                       lognH=nebula_lognH,
+                                       wave_grid=self.wave_grid_rest)
         else:
             raise ValueError("Stellar type '%s' not understood." % (self.stellar_type))
 
@@ -1114,6 +1120,14 @@ class Lightning:
 
         return lnu_processed, lnu_intrinsic
 
+    def get_model_lines(self, params, stepwise=False):
+
+        sfh_params, stellar_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = self._separate_params(params)
+
+        lines = self.stars.get_model_lines(self.sfh, sfh_params, stellar_params)
+
+        return lines
+
     def get_xray_model_lnu(self, params):
         '''Construct the low-resolution X-ray SED model.
 
@@ -1432,8 +1446,8 @@ class Lightning:
 
             log_prob = log_like + log_prior
 
-            #print('log prior:', log_prior[0])
-            #print('log like:', log_like[0])
+            # print('log prior:', log_prior[0])
+            # print('log like:', log_like[0])
 
         else:
 
