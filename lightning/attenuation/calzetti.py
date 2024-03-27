@@ -97,11 +97,11 @@ class ModifiedCalzettiAtten(AnalyticAtten):
     Nparams = 3
     param_names = ['mcalz_tauV_diff', 'mcalz_delta', 'mcalz_tauV_BC']
     param_descr = ['Optical depth of the diffuse ISM',
-                   'Deviation from the Calzetti+2000 UV power law slope',
+                   'Deviation from the Calzetti+2000 UV power law slope (Upper limit set by requiring Eb >= 0)',
                    'Optical depth of the birth cloud in star forming regions']
     param_names_fncy = [r'$\tau_{V,\rm diff}$', r'$\delta_{\rm UV}$', r'$\tau_{V,\rm BC}$']
     param_bounds = np.array([[0, np.inf],
-                             [-np.inf, np.inf],
+                             [-np.inf, 0.85 / 1.9], # Keep bump strength from going negative.
                              [0, np.inf]])
 
     def __init__(self, wave):
