@@ -18,7 +18,7 @@ from scipy.io import readsav
 
 from ..base import BaseEmissionModel
 
-__all__ = ['BPASSModel']
+__all__ = ['BPASSModel', 'BPASSModelA24']
 
 #################################
 # Build stellar pop'ns
@@ -340,6 +340,11 @@ class BPASSModel(BaseEmissionModel):
 
             Nages = len(self.age)
             self.Nages = Nages
+
+            q0_age = np.zeros((self.Nages, len(self.Zmet)))
+            lbol_age = np.zeros((self.Nages, len(self.Zmet)))
+            mstar_age = np.zeros((self.Nages, len(self.Zmet)))
+            # mstar_rem_age = np.zeros((self.Nages, len(self.Zmet)))
 
             if (nebular_effects):
                 lnu_age = np.zeros((self.Nages, len(self.Zmet), len(self.logU), len(wave_model)), dtype='double') # Lnu(wave) per bin and logU
@@ -958,6 +963,11 @@ class BPASSModelA24(BaseEmissionModel):
 
             Nages = len(self.age)
             self.Nages = Nages
+            q0_age = np.zeros((self.Nages, len(self.Zmet)))
+            lbol_age = np.zeros((self.Nages, len(self.Zmet)))
+            mstar_age = np.zeros((self.Nages, len(self.Zmet)))
+            mstar_rem_age = np.zeros((self.Nages, len(self.Zmet)))
+
 
             if (nebular_effects):
                 lnu_age = np.zeros((self.Nages, len(self.Zmet), len(self.logU), len(wave_model)), dtype='double') # Lnu(wave) per bin and logU
@@ -978,7 +988,7 @@ class BPASSModelA24(BaseEmissionModel):
 
             if (nebular_effects):
                 linelum_finterp = interp1d(time, linelum, axis=0)
-                linelum_age = llines_finterp(self.age)
+                linelum_age = linelum_finterp(self.age)
 
         self.mstar = mstar_age
         self.Lbol = lbol_age
