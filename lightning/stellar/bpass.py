@@ -18,7 +18,7 @@ from scipy.io import readsav
 
 from ..base import BaseEmissionModel
 
-__all__ = ['BPASSModel', 'BPASSModelA24']
+__all__ = ['BPASSModel', 'BPASSModelA24', 'BPASSBurstA24']
 
 #################################
 # Build stellar pop'ns
@@ -1307,3 +1307,188 @@ class BPASSModelA24(BaseEmissionModel):
                 Lmod_lines = sfh.integrate(sfh_param, L_lines)
 
             return Lmod_lines
+
+class BPASSBurstA24(BPASSModelA24):
+    '''
+    SFH-free model representing a single instantaneous burst
+    of star formation with a given mass and age.
+    '''
+
+    def __init__(self, filter_labels, redshift, wave_grid=None, age=None, lognH=2.0, cosmology=None):
+
+        if cosmology is None:
+            from astropy.cosmology import FlatLambdaCDM
+            cosmology = FlatLambdaCDM(H0=70, Om0=0.3)
+
+        univ_age = cosmology.age(redshift).value * 1e9
+
+        # "Erik googled how super() works after 15 years"
+        super().__init__(filter_labels, redshift, step=False, wave_grid=wave_grid, age=age, lognH=lognH, cosmology=cosmology)
+
+        # Overwrite parameters for clarity
+        self.nebular = True # Why wouldn't you
+        self.Nparams = 4
+        self.param_names = ['logMburst', 'logtburst', 'Zmet', 'logU']
+        self.param_descr = ['Stellar mass formed, in solar masses',
+                            'Age of burst in years',
+                            'Metallicity (mass fraction, where solar = 0.020 ~ 10**[-1.7])',
+                            'log10 of the ionization parameter']
+        self.param_names_fncy = [r'$\log M_{\rm burst}$', r'$\log t_{\rm burst}$', r'$Z$', r'$\log \mathcal{U}$']
+        self.param_bounds = np.array([[0, 9],
+                                      [6, np.log10(univ_age)],
+                                      [np.min(self.Zmet), np.max(self.Zmet)],
+                                      [-4, -1.5]])
+
+    def get_model_lnu_hires(self, params, exptau=None):
+        '''
+
+        Parameters
+        ----------
+        params : array-like (Nmodels, 4)
+            The parameters are, in order, Mburst, tburst, Z, and logU. In practice we'll probably
+            sample log(Mburst) and log(tburst).
+        exptau : array-like (Nmodels, Nwave)
+            Attenuation curve(s) evaluated at model wavelengths; really it's exp(-tau)
+
+        Returns
+        -------
+        lnu_unattenuated
+        lnu_unattenuated
+        L_TIR
+
+        '''
+
+        params = params.copy()
+
+        if len(params.shape) == 1:
+            params = params.reshape(1,-1)
+
+        Nmodels = params.shape[0]
+        Mburst = 10**params[:,0]
+        params[:,1] = 10**params[:,1]
+        # And:
+        # tburst = params[:,1]
+        # Zmet = params[:,2]
+        # logU = params[:,3]
+
+        finterp_lnu = interp1d(self.age, np.log10(self.Lnu_obs), axis=0)
+
+        # The axes go (age, Z, logU, wave)
+        lnu_unattenuated = 10**interpn((self.age, self.Zmet, self.logU),
+                                 np.log10(self.Lnu_obs),
+                                 params[:,1:],
+                                 method='linear')
+
+        # The source models are currently NaN at some (X-ray) wavelengths. Will
+        # have to fix that.
+        lnu_unattenuated[np.isnan(lnu_unattenuated)] = 0.0
+
+        lnu_unattenuated *= Mburst[:,None]
+
+        if (exptau is None):
+            exptau = np.full((Nmodels,len(self.wave_grid_obs)),1)
+
+        lnu_attenuated = exptau * lnu_unattenuated
+
+        L_TIR = np.abs(trapz(lnu_unattenuated - lnu_attenuated, self.nu_grid_obs, axis=1))
+
+        # lmod_attenuated = np.zeros((Nmodels, self.Nfilters))
+        # lmod_unattenuated = np.zeros((Nmodels, self.Nfilters))
+        # for i, filter_label in enumerate(self.filters):
+        #     lmod_attenuated[:,i] = trapz(self.filters[filter_label][None,:] * lnu_attenuated, self.wave_grid_obs, axis=1)
+        #     lmod_unattenuated[:,i] = trapz(self.filters[filter_label][None,:] * lnu_unattenuated, self.wave_grid_obs, axis=1)
+
+        return lnu_attenuated, lnu_unattenuated, L_TIR
+
+    def get_model_lnu(self, params, exptau=None):
+        '''
+        Parameters
+        ----------
+        params : array-like (Nmodels, 4)
+            The parameters are, in order, Mburst, tburst, Z, and logU. In practice we'll probably
+            sample log(Mburst) and log(tburst).
+        exptau : array-like (Nmodels, Nwave)
+            Attenuation curve(s) evaluated at model wavelengths; really it's exp(-tau)
+
+        Returns
+        -------
+        lmod_unattenuated
+        lmod_unattenuated
+        L_TIR
+
+        '''
+
+        if (len(params.shape) == 1):
+            params = params.reshape(1, -1)
+
+
+        if (self.step):
+            assert (sfh.type == 'piecewise'), 'Binned stellar populations require a piecewise-defined SFH.'
+
+        Nmodels = params.shape[0]
+
+        if (self.nebular):
+            assert (params is not None), 'BPASS models with the Cloudy component enabled require logU to be specified.'
+            assert (params.shape[0] == Nmodels), 'First dimension of logU array must match first dimension of SFH.'
+
+        if (exptau is None):
+            exptau = np.full((Nmodels,len(self.wave_grid_rest)),1)
+        else:
+            assert (exptau.shape[0] == Nmodels), 'First dimension of exptau must match first dimension of SFH.'
+
+        lnu_attenuated, lnu_unattenuated, L_TIR = self.get_model_lnu_hires(params, exptau=exptau)
+
+        if (Nmodels == 1):
+            lnu_attenuated = lnu_attenuated.reshape(1,-1)
+            lnu_unattenuated = lnu_unattenuated.reshape(1,-1)
+
+        lmod_attenuated = np.zeros((Nmodels, self.Nfilters))
+        lmod_unattenuated = np.zeros((Nmodels, self.Nfilters))
+
+        for i, filter_label in enumerate(self.filters):
+            # Recall that the filters are normalized to 1 when integrated against wave_grid_obs
+            # so we can integrate with that to get the mean Lnu in each band.
+            lmod_attenuated[:,i] = trapz(self.filters[filter_label][None,:] * lnu_attenuated, self.wave_grid_obs, axis=1)
+            lmod_unattenuated[:,i] = trapz(self.filters[filter_label][None,:] * lnu_unattenuated, self.wave_grid_obs, axis=1)
+
+        if (Nmodels == 1):
+            lmod_attenuated = lmod_attenuated.flatten()
+            lmod_unattenuated = lmod_unattenuated.flatten()
+            L_TIR = L_TIR.flatten()
+
+
+        return lmod_attenuated, lmod_unattenuated, L_TIR
+
+    def get_model_lines(self, params, exptau=None):
+        '''
+        Parameters
+        ----------
+        params : array-like (Nmodels, 4)
+            The parameters are, in order, Mburst, tburst, Z, and logU. In practice we'll probably
+            sample log(Mburst) and log(tburst).
+        exptau : array-like (Nmodels, Nwave)
+            Attenuation curve(s) evaluated at model wavelengths; really it's exp(-tau). Currently unused, i.e.
+            line luminosities returned are intrinsic, unreddened.
+
+        Returns
+        -------
+        lmod_lines
+
+        '''
+
+        if (len(params.shape) == 1):
+            params = params.reshape(1, -1)
+
+        Nmodels = params.shape[0]
+        Mburst = params[:,0]
+
+        L_lines = 10**interpn((self.age, self.Zmet, self.logU),
+                               np.log10(self.line_lum),
+                               params[:,1:],
+                               method='linear')
+
+        # Send the originally 0 luminosities made NaN by log interpolation back to 0.
+        L_lines[np.isnan(L_lines)] = 0
+        L_lines *= Mburst[:,None]
+
+        return L_lines

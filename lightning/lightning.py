@@ -32,7 +32,7 @@ from astropy.io import ascii
 # Lightning
 from .sfh import PiecewiseConstSFH, DelayedExponentialSFH, SingleExponentialSFH
 #from .sfh.delayed_exponential import
-from .stellar import PEGASEModel, PEGASEModelA24, BPASSModel, BPASSModelA24
+from .stellar import PEGASEModel, PEGASEModelA24, PEGASEBurstA24, BPASSModel, BPASSModelA24, BPASSBurstA24
 from .dust import DL07Dust as DustModel # Move inside setup function where needed?
 from .agn import AGNModel # Move inside setup function where needed?
 from .xray import StellarPlaw, AGNPlaw, Qsosed
@@ -281,7 +281,7 @@ class Lightning:
 
         # This block sets up the star formation history and
         # stellar population models
-        allowed_SFHs = ['Piecewise-Constant', 'Delayed-Exponential', 'Single-Exponential']
+        allowed_SFHs = ['Piecewise-Constant', 'Delayed-Exponential', 'Single-Exponential', 'Burst']
         if SFH_type not in allowed_SFHs:
             print('Allowed SFHs are:', allowed_SFHs)
             raise ValueError("SFH type '%s' not understood." % (SFH_type))
@@ -558,25 +558,40 @@ class Lightning:
         '''
 
         step = 'Piecewise' in self.SFH_type
+        if (self.SFH_type == 'Burst') and ('A24' not in self.stellar_type):
+            raise ValueError("Burst models only available for the 'A24' model set.")
 
         if (self.stellar_type == 'PEGASE'):
             self.stars = PEGASEModel(self.filter_labels, self.redshift, age=self.ages,
                                      step=step, cosmology=self.cosmology,
                                      wave_grid=self.wave_grid_rest)
         elif (self.stellar_type == 'PEGASE-A24'):
-            self.stars = PEGASEModelA24(self.filter_labels, self.redshift, age=self.ages,
-                                       step=step, cosmology=self.cosmology,
-                                       lognH=nebula_lognH,
-                                       wave_grid=self.wave_grid_rest)
+            if self.SFH_type == 'Burst':
+                self.stars = PEGASEBurstA24(self.filter_labels, self.redshift, age=self.ages,
+                                            cosmology=self.cosmology,
+                                            lognH=nebula_lognH,
+                                            wave_grid=self.wave_grid_rest)
+            else:
+                self.stars = PEGASEModelA24(self.filter_labels, self.redshift, age=self.ages,
+                                           step=step, cosmology=self.cosmology,
+                                           lognH=nebula_lognH,
+                                           wave_grid=self.wave_grid_rest)
+
         elif (self.stellar_type == 'BPASS'):
             self.stars = BPASSModel(self.filter_labels, self.redshift, age=self.ages,
                                     step=step, cosmology=self.cosmology,
                                     wave_grid=self.wave_grid_rest)
         elif (self.stellar_type == 'BPASS-A24'):
-            self.stars = BPASSModelA24(self.filter_labels, self.redshift, age=self.ages,
-                                       step=step, cosmology=self.cosmology,
-                                       lognH=nebula_lognH,
-                                       wave_grid=self.wave_grid_rest)
+            if self.SFH_type == 'Burst':
+                self.stars = BPASSBurstA24(self.filter_labels, self.redshift, age=self.ages,
+                                            cosmology=self.cosmology,
+                                            lognH=nebula_lognH,
+                                            wave_grid=self.wave_grid_rest)
+            else:
+                self.stars = BPASSModelA24(self.filter_labels, self.redshift, age=self.ages,
+                                           step=step, cosmology=self.cosmology,
+                                           lognH=nebula_lognH,
+                                           wave_grid=self.wave_grid_rest)
         else:
             raise ValueError("Stellar type '%s' not understood." % (self.stellar_type))
 
@@ -584,7 +599,7 @@ class Lightning:
         # from the SPS model.
         if self.ages is None:
             self.ages = self.stars.age
-            self.Nages = len(self.Nages)
+            self.Nages = len(self.ages)
 
         if (self.SFH_type == 'Piecewise-Constant'):
             self.sfh = PiecewiseConstSFH(self.ages)
@@ -595,6 +610,8 @@ class Lightning:
         elif (self.SFH_type == 'Single-Exponential'):
             self.sfh = SingleExponentialSFH(self.ages)
             #step=False
+        elif (self.SFH_type == 'Burst'):
+            self.sfh = None
         else:
             raise ValueError("SFH type '%s' not understood." % (self.SFH_type))
 
@@ -725,8 +742,12 @@ class Lightning:
 
         assert (Nparams == self.Nparams), 'Number of provided parameters (%d) must match the total number of parameters expected by the model (%d). Check Lightning.print_params().' % (Nparams, self.Nparams)
 
-        sfh_params = params[:, 0:self.sfh.Nparams]
-        i = self.sfh.Nparams
+        i = 0
+        if (self.sfh is not None):
+            sfh_params = params[:, i:i + self.sfh.Nparams]
+            i += self.sfh.Nparams
+        else:
+            sfh_params = None
         if (self.stars.Nparams != 0):
             stellar_params = params[:,i:i + self.stars.Nparams]
             i += self.stars.Nparams
@@ -822,11 +843,15 @@ class Lightning:
             #exptau_youngest = exptau.reshape(1,-1)
 
 
-        lnu_stellar_attenuated, lnu_stellar_unattenuated, L_TIR_stellar = self.stars.get_model_lnu_hires(self.sfh,
-                                                                                                         sfh_params,
-                                                                                                         params=stellar_params,
-                                                                                                         exptau=expminustau,
-                                                                                                         stepwise=False)
+        if (self.SFH_type != 'Burst'):
+            lnu_stellar_attenuated, lnu_stellar_unattenuated, L_TIR_stellar = self.stars.get_model_lnu_hires(self.sfh,
+                                                                                                             sfh_params,
+                                                                                                             params=stellar_params,
+                                                                                                             exptau=expminustau,
+                                                                                                             stepwise=False)
+        else:
+            lnu_stellar_attenuated, lnu_stellar_unattenuated, L_TIR_stellar = self.stars.get_model_lnu_hires(stellar_params,
+                                                                                                             exptau=expminustau)
 
         lnu_intrinsic = lnu_stellar_unattenuated
         lnu_processed = lnu_stellar_attenuated
@@ -994,11 +1019,21 @@ class Lightning:
 
         hires_models = dict()
 
-        lnu_stellar_attenuated, lnu_stellar_unattenuated, L_TIR_stellar = self.stars.get_model_lnu_hires(self.sfh,
-                                                                                                         sfh_params,
-                                                                                                         params=stellar_params,
-                                                                                                         exptau=expminustau,
-                                                                                                         stepwise=False)
+        # lnu_stellar_attenuated, lnu_stellar_unattenuated, L_TIR_stellar = self.stars.get_model_lnu_hires(self.sfh,
+        #                                                                                                  sfh_params,
+        #                                                                                                  params=stellar_params,
+        #                                                                                                  exptau=expminustau,
+        #                                                                                                  stepwise=False)
+
+        if (self.SFH_type != 'Burst'):
+            lnu_stellar_attenuated, lnu_stellar_unattenuated, L_TIR_stellar = self.stars.get_model_lnu_hires(self.sfh,
+                                                                                                             sfh_params,
+                                                                                                             params=stellar_params,
+                                                                                                             exptau=expminustau,
+                                                                                                             stepwise=False)
+        else:
+            lnu_stellar_attenuated, lnu_stellar_unattenuated, L_TIR_stellar = self.stars.get_model_lnu_hires(stellar_params,
+                                                                                                             exptau=expminustau)
 
         hires_models['stellar_attenuated'] = lnu_stellar_attenuated
         hires_models['stellar_unattenuated'] = lnu_stellar_unattenuated
@@ -1129,7 +1164,12 @@ class Lightning:
 
         sfh_params, stellar_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = self._separate_params(params)
 
-        lines = self.stars.get_model_lines(self.sfh, sfh_params, stellar_params)
+
+
+        if (self.SFH_type != 'Burst'):
+            lines = self.stars.get_model_lines(self.sfh, sfh_params, stellar_params)
+        else:
+            lines = self.stars.get_model_lines(stellar_params)
 
         return lines
 
