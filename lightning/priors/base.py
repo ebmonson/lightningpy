@@ -47,6 +47,32 @@ class AnalyticPrior():
 
         return np.zeros_like(x)
 
+    def sample(self, size, rng=None, seed=None):
+        '''Sample from the prior.
+
+        Parameters
+        ----------
+        size : int
+            Number of samples to draw
+        rng : numpy.random.Generator
+            Numpy object for random number generation;
+            see `numpy.random.default_rng()`
+        seed : int
+            Seed for random number generation. If you pass
+            a pre-constructed generator this is ignored.
+
+        Returns
+        -------
+        samples : numpy array
+            Random samples
+        '''
+
+        if rng is None: rng = np.random.default_rng(seed)
+
+        q = rng.uniform(size=size)
+
+        return self.quantile(q)
+
 class TabulatedPrior():
     '''Base class for tabulated priors.
 
@@ -83,6 +109,32 @@ class TabulatedPrior():
         '''
 
         return self.inverse(q)
+
+    def sample(self, size, rng=None):
+        '''Sample from the prior.
+
+        Parameters
+        ----------
+        size : int
+            Number of samples to draw
+        rng : numpy.random.Generator
+            Numpy object for random number generation;
+            see `numpy.random.default_rng()`
+        seed : int
+            Seed for random number generation. If you pass
+            a pre-constructed generator this is ignored.
+
+        Returns
+        -------
+        samples : numpy array
+            Random samples
+        '''
+
+        if rng is None: rng = np.random.default_rng()
+
+        q = rng.uniform(size=size)
+
+        return self.quantile(q)
 
     def __call__(self, x):
 
