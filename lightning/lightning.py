@@ -1540,7 +1540,7 @@ class Lightning:
         return np.any(ob_mask, axis=1)
 
 
-    def _fit_emcee(self, p0, Nwalkers=64, Nsteps=20000, progress=True, **kwargs):
+    def _fit_emcee(self, p0, Nwalkers=64, Nsteps=20000, progress=True, check_init=True, **kwargs):
         '''
         Helper function to fit with emcee
         '''
@@ -1586,6 +1586,12 @@ class Lightning:
         #log_prob_func = lambda x: self.get_model_log_prob(x[:self.Nsteps], x[self.Nsteps:], negative=False)
 
         #N_burn = kwargs['N_burn']
+
+        if check_init:
+            logprob_init = self.get_model_log_prob(p0, priors=priors, negative=False)
+            ob_init = ~np.isfinite(logprob_init)
+            if np.any(ob_init):
+                raise ValueError('Initial state is outside prior support for %d/%d walkers. Check initialization and try again; consider intializing from priors.' % (np.count_nonzero(ob_init), len(ob_init)))
 
         sampler = emcee.EnsembleSampler(Nwalkers, Ndim - Nconst_dim, log_prob_func, vectorize=True)
 
