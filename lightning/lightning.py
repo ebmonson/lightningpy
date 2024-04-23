@@ -1642,7 +1642,8 @@ class Lightning:
     #     return res
 
     def _fit_LBFGSB(self, p0, disp=False, maxiter=None,
-                    MCMC_followup=False, MCMC_kwargs={'Nwalkers':64,'Nsteps':1000,'progress':True, 'init_scale':1e-3},
+                    MCMC_followup=False, force=True,
+                    MCMC_kwargs={'Nwalkers':64,'Nsteps':1000,'progress':True, 'init_scale':1e-3},
                     **kwargs):
         '''Helper function to fit with the L-BFGS-B algorithm.
 
@@ -1662,6 +1663,10 @@ class Lightning:
             Maximum number of iterations for the minimizer. By default, this is 500 times the number of parameters.
         MCMC_followup : bool
             If `True`, perform the MCMC followup briefly described above.
+        force : bool
+            If `True`, try to do the MCMC followup even if the solver did not succesfully converge. The solver can, e.g.
+            fail if it arrives at a region of parameter space where gradient is too flat, whereas the mcmc may
+            successfully escape this region.
         MCMC_kwargs : dict
             Keywords passed through to Lightning.fit(method='emcee'), i.e. `Nwalkers` and `Nsteps`. The keyword
             `init_scale` is not passed through (yet, I'll probably change that), and is just used to initialize the MCMC
@@ -1717,7 +1722,9 @@ class Lightning:
                        options={'disp': disp,
                                 'maxiter': maxiter})
 
-        if (res.success and MCMC_followup):
+        do_followup = (res.success and MCMC_followup) or (MCMC_followup and force)
+
+        if (do_followup):
             from lightning.priors import UniformPrior
             import emcee
             rng = np.random.default_rng()
