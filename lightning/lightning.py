@@ -32,7 +32,7 @@ from astropy.io import ascii
 # Lightning
 from .sfh import PiecewiseConstSFH, DelayedExponentialSFH, SingleExponentialSFH
 #from .sfh.delayed_exponential import
-from .stellar import StellarModel
+from .stellar import PEGASEModel, PEGASEModelA24, PEGASEBurstA24, BPASSModel, BPASSModelA24, BPASSBurstA24
 from .dust import DL07Dust as DustModel # Move inside setup function where needed?
 from .agn import AGNModel # Move inside setup function where needed?
 from .xray import StellarPlaw, AGNPlaw, Qsosed
@@ -70,6 +70,8 @@ class Lightning:
     wave_grid : tuple (3,), or np.ndarray, (Nwave,), float32, optional
         Either a tuple specifying a log-spaced wavelength grid, or an array
         giving the wavelengths.
+    stellar_type : {'PEGASE', 'BPASS', 'BPASS-A24'}
+        String specifying the simple stellar population models to use.
     SFH_type : {'Piecewise-Constant', 'Delayed-Exponential'}
         String specifying the SFH type to use.
     ages : np.ndarray, (Nages,), float32
@@ -139,12 +141,14 @@ class Lightning:
                  redshift=None, lum_dist=None,
                  flux_obs=None, flux_obs_unc=None,
                  wave_grid=(0.1, 1000, 1200),
+                 stellar_type='PEGASE',
+                 nebula_lognH=2.0,
                  SFH_type='Piecewise-Constant', ages=None,
                  atten_type='Modified-Calzetti',
                  dust_emission=False,
                  agn_emission=False,
                  agn_polar_dust=False,
-                 xray_mode='counts',
+                 xray_mode=None,
                  xray_stellar_emission=None,
                  xray_agn_emission=None,
                  xray_absorption=None,
@@ -277,7 +281,7 @@ class Lightning:
 
         # This block sets up the star formation history and
         # stellar population models
-        allowed_SFHs = ['Piecewise-Constant', 'Delayed-Exponential', 'Single-Exponential']
+        allowed_SFHs = ['Piecewise-Constant', 'Delayed-Exponential', 'Single-Exponential', 'Burst']
         if SFH_type not in allowed_SFHs:
             print('Allowed SFHs are:', allowed_SFHs)
             raise ValueError("SFH type '%s' not understood." % (SFH_type))
@@ -289,7 +293,7 @@ class Lightning:
             # Define default stellar age bins
             if (ages is None):
                 if (univ_age < 1):
-                    raise ValueError('Redshift too large; fewer than 4 age bins in SFH.')
+                    raise ValueError('Redshift too large; fewer than 4 default age bins in SFH.')
                 elif (univ_age < 5):
                     self.ages = np.array([0, 1.0e7, 1.0e8, 1.0e9, univ_age * 1e9])
                 else:
@@ -309,19 +313,26 @@ class Lightning:
                 # This is not the ideal age grid for the stellar population models, and the choice of the ideal
                 # grid is non-trivial. The best we might be able to do is to fall back to the ages the models
                 # were originally generated at.
-                self.ages = np.logspace(6, np.log10(univ_age * 1e9), 20) # Log spaced grid from 1 Myr to the age of the Universe.
-                self.ages[-1] = (univ_age * 1e9)
+                #self.ages = np.logspace(6, np.log10(univ_age * 1e9), 20) # Log spaced grid from 1 Myr to the age of the Universe.
+                #self.ages[-1] = (univ_age * 1e9)
+                self.ages = None # Fall back to whatever grid the SPS models have
             else:
                 self.ages = np.array(ages)
 
-            self.ages = np.sort(self.ages)
-            if (np.any(self.ages > (univ_age * 1e9))):
-                raise ValueError('None of the provided ages can exceed the age of the Universe at z.')
+                self.ages = np.sort(self.ages)
+                if (np.any(self.ages > (univ_age * 1e9))):
+                    raise ValueError('None of the provided ages can exceed the age of the Universe at z.')
 
-            self.Nages = len(self.ages)
+                self.Nages = len(self.ages)
 
+        allowed_stars = ['PEGASE', 'PEGASE-A24', 'BPASS', 'BPASS-A24']
+        if stellar_type not in allowed_stars:
+            print('Allowed simple stellar population models are:', allowed_stars)
+            raise ValueError("Stellar type '%s' not understood." % (stellar_type))
+        else:
+            self.stellar_type = stellar_type
+            self._setup_stellar(nebula_lognH)
 
-        self._setup_stellar()
         t3 = time.time()
 
         # Set up dust attenuation
@@ -394,7 +405,7 @@ class Lightning:
 
         # For later use, make an array of the model components and
         # figure out how many components our total model has
-        self.model_components = [self.sfh, self.atten, self.dust, self.agn,
+        self.model_components = [self.sfh, self.stars, self.atten, self.dust, self.agn,
                                  self.xray_stellar_em, self.xray_agn_em, self.xray_abs_intr]
         self.Nparams = 0
         for mod in self.model_components:
@@ -541,25 +552,69 @@ class Lightning:
             self.wave_obs[i] = lam
 
 
-    def _setup_stellar(self):
+    def _setup_stellar(self, nebula_lognH):
         '''
         Initialize SFH model and stellar population.
         '''
 
+        step = 'Piecewise' in self.SFH_type
+        if (self.SFH_type == 'Burst') and ('A24' not in self.stellar_type):
+            raise ValueError("Burst models only available for the 'A24' model set.")
+
+        if (self.stellar_type == 'PEGASE'):
+            self.stars = PEGASEModel(self.filter_labels, self.redshift, age=self.ages,
+                                     step=step, cosmology=self.cosmology,
+                                     wave_grid=self.wave_grid_rest)
+        elif (self.stellar_type == 'PEGASE-A24'):
+            if self.SFH_type == 'Burst':
+                self.stars = PEGASEBurstA24(self.filter_labels, self.redshift, age=self.ages,
+                                            cosmology=self.cosmology,
+                                            lognH=nebula_lognH,
+                                            wave_grid=self.wave_grid_rest)
+            else:
+                self.stars = PEGASEModelA24(self.filter_labels, self.redshift, age=self.ages,
+                                           step=step, cosmology=self.cosmology,
+                                           lognH=nebula_lognH,
+                                           wave_grid=self.wave_grid_rest)
+
+        elif (self.stellar_type == 'BPASS'):
+            self.stars = BPASSModel(self.filter_labels, self.redshift, age=self.ages,
+                                    step=step, cosmology=self.cosmology,
+                                    wave_grid=self.wave_grid_rest)
+        elif (self.stellar_type == 'BPASS-A24'):
+            if self.SFH_type == 'Burst':
+                self.stars = BPASSBurstA24(self.filter_labels, self.redshift, age=self.ages,
+                                            cosmology=self.cosmology,
+                                            lognH=nebula_lognH,
+                                            wave_grid=self.wave_grid_rest)
+            else:
+                self.stars = BPASSModelA24(self.filter_labels, self.redshift, age=self.ages,
+                                           step=step, cosmology=self.cosmology,
+                                           lognH=nebula_lognH,
+                                           wave_grid=self.wave_grid_rest)
+        else:
+            raise ValueError("Stellar type '%s' not understood." % (self.stellar_type))
+
+        # If we don't have an age grid yet, take it
+        # from the SPS model.
+        if self.ages is None:
+            self.ages = self.stars.age
+            self.Nages = len(self.ages)
+
         if (self.SFH_type == 'Piecewise-Constant'):
             self.sfh = PiecewiseConstSFH(self.ages)
-            step=True
+            #step=True
         elif (self.SFH_type == 'Delayed-Exponential'):
             self.sfh = DelayedExponentialSFH(self.ages)
-            step=False
+            #step=False
         elif (self.SFH_type == 'Single-Exponential'):
             self.sfh = SingleExponentialSFH(self.ages)
-            step=False
+            #step=False
+        elif (self.SFH_type == 'Burst'):
+            self.sfh = None
         else:
-            raise ValueError("SFH type (%s) not understood." % (self.SFH_type))
+            raise ValueError("SFH type '%s' not understood." % (self.SFH_type))
 
-        self.stars = StellarModel(self.filter_labels, self.redshift, age=self.ages,
-                                  Z_met=0.020, step=step, wave_grid=self.wave_grid_rest)
 
 
     def _setup_dust_att(self):
@@ -654,7 +709,7 @@ class Lightning:
 
         if (verbose):
             for mod in self.model_components:
-                if (mod is not None):
+                if (mod is not None) and (mod.Nparams != 0):
                     print('')
                     print('============================')
                     print(mod.model_name)
@@ -668,7 +723,7 @@ class Lightning:
                     ascii.write(mod_table, format='fixed_width_two_line')
         else:
             for mod in self.model_components:
-                if (mod is not None):
+                if (mod is not None) and (mod.Nparams != 0):
                     print(mod.param_names)
 
         print('')
@@ -687,8 +742,17 @@ class Lightning:
 
         assert (Nparams == self.Nparams), 'Number of provided parameters (%d) must match the total number of parameters expected by the model (%d). Check Lightning.print_params().' % (Nparams, self.Nparams)
 
-        sfh_params = params[:, 0:self.sfh.Nparams]
-        i = self.sfh.Nparams
+        i = 0
+        if (self.sfh is not None):
+            sfh_params = params[:, i:i + self.sfh.Nparams]
+            i += self.sfh.Nparams
+        else:
+            sfh_params = None
+        if (self.stars.Nparams != 0):
+            stellar_params = params[:,i:i + self.stars.Nparams]
+            i += self.stars.Nparams
+        else:
+            stellar_params = None
         if (self.atten is not None):
             atten_params = params[:,i:i + self.atten.Nparams]
             i += self.atten.Nparams
@@ -727,7 +791,7 @@ class Lightning:
         #   in there.
         # Is that slow? This is going to be a function that we call on every model
         # evaluation.
-        return sfh_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params
+        return sfh_params, stellar_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params
 
 
     def get_model_lnu_hires(self, params, stepwise=False):
@@ -767,7 +831,7 @@ class Lightning:
         #Nsteps = sfh_shape[1]
         Nparams = param_shape[1]
 
-        sfh_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = self._separate_params(params)
+        sfh_params, stellar_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = self._separate_params(params)
 
         # exptau = modified_calzetti(self.wave_grid_rest, params[:,0], params[:,1], np.zeros(Nmodels)) # ndarray(Nmodels, len(self.wave_grid_rest))
         # exptau_youngest = modified_calzetti(self.wave_grid_rest, params[:,0], params[:,1], params[:,2])
@@ -779,10 +843,15 @@ class Lightning:
             #exptau_youngest = exptau.reshape(1,-1)
 
 
-        lnu_stellar_attenuated, lnu_stellar_unattenuated, L_TIR_stellar = self.stars.get_model_lnu_hires(self.sfh,
-                                                                                                         sfh_params,
-                                                                                                         exptau=expminustau,
-                                                                                                         stepwise=False)
+        if (self.SFH_type != 'Burst'):
+            lnu_stellar_attenuated, lnu_stellar_unattenuated, L_TIR_stellar = self.stars.get_model_lnu_hires(self.sfh,
+                                                                                                             sfh_params,
+                                                                                                             params=stellar_params,
+                                                                                                             exptau=expminustau,
+                                                                                                             stepwise=False)
+        else:
+            lnu_stellar_attenuated, lnu_stellar_unattenuated, L_TIR_stellar = self.stars.get_model_lnu_hires(stellar_params,
+                                                                                                             exptau=expminustau)
 
         lnu_intrinsic = lnu_stellar_unattenuated
         lnu_processed = lnu_stellar_attenuated
@@ -846,7 +915,7 @@ class Lightning:
         Nmodels = param_shape[0]
         Nparams = param_shape[1]
 
-        sfh_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = self._separate_params(params)
+        sfh_params, stellar_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = self._separate_params(params)
 
         lnu_xray_unabs = np.zeros((Nmodels, len(self.xray_wave_grid_rest)))
         lnu_xray_abs = np.zeros((Nmodels, len(self.xray_wave_grid_rest)))
@@ -940,7 +1009,7 @@ class Lightning:
         # exptau = modified_calzetti(self.wave_grid_rest, params[:,0], params[:,1], np.zeros(Nmodels)) # ndarray(Nmodels, len(self.wave_grid_rest))
         # exptau_youngest = modified_calzetti(self.wave_grid_rest, params[:,0], params[:,1], params[:,2])
 
-        sfh_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = self._separate_params(params)
+        sfh_params, stellar_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = self._separate_params(params)
 
         expminustau = self.atten.evaluate(atten_params)
 
@@ -950,10 +1019,21 @@ class Lightning:
 
         hires_models = dict()
 
-        lnu_stellar_attenuated, lnu_stellar_unattenuated, L_TIR_stellar = self.stars.get_model_lnu_hires(self.sfh,
-                                                                                                         sfh_params,
-                                                                                                         exptau=expminustau,
-                                                                                                         stepwise=False)
+        # lnu_stellar_attenuated, lnu_stellar_unattenuated, L_TIR_stellar = self.stars.get_model_lnu_hires(self.sfh,
+        #                                                                                                  sfh_params,
+        #                                                                                                  params=stellar_params,
+        #                                                                                                  exptau=expminustau,
+        #                                                                                                  stepwise=False)
+
+        if (self.SFH_type != 'Burst'):
+            lnu_stellar_attenuated, lnu_stellar_unattenuated, L_TIR_stellar = self.stars.get_model_lnu_hires(self.sfh,
+                                                                                                             sfh_params,
+                                                                                                             params=stellar_params,
+                                                                                                             exptau=expminustau,
+                                                                                                             stepwise=False)
+        else:
+            lnu_stellar_attenuated, lnu_stellar_unattenuated, L_TIR_stellar = self.stars.get_model_lnu_hires(stellar_params,
+                                                                                                             exptau=expminustau)
 
         hires_models['stellar_attenuated'] = lnu_stellar_attenuated
         hires_models['stellar_unattenuated'] = lnu_stellar_unattenuated
@@ -1080,6 +1160,19 @@ class Lightning:
 
         return lnu_processed, lnu_intrinsic
 
+    def get_model_lines(self, params, stepwise=False):
+
+        sfh_params, stellar_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = self._separate_params(params)
+
+
+
+        if (self.SFH_type != 'Burst'):
+            lines = self.stars.get_model_lines(self.sfh, sfh_params, stellar_params)
+        else:
+            lines = self.stars.get_model_lines(stellar_params)
+
+        return lines
+
     def get_xray_model_lnu(self, params):
         '''Construct the low-resolution X-ray SED model.
 
@@ -1108,7 +1201,7 @@ class Lightning:
         Nmodels = param_shape[0]
         Nparams = param_shape[1]
 
-        sfh_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = self._separate_params(params)
+        sfh_params, stellar_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = self._separate_params(params)
 
         lnu_xray_unabs = np.zeros((Nmodels, len(self.filter_labels)))
         lnu_xray_abs = np.zeros((Nmodels, len(self.filter_labels)))
@@ -1189,7 +1282,7 @@ class Lightning:
         Nmodels = param_shape[0]
         Nparams = param_shape[1]
 
-        sfh_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = self._separate_params(params)
+        sfh_params, stellar_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = self._separate_params(params)
 
         #counts_xray_unabs = np.zeros((Nmodels, len(self.filter_labels)))
         counts_xray_abs = np.zeros((Nmodels, len(self.filter_labels)))
@@ -1398,8 +1491,8 @@ class Lightning:
 
             log_prob = log_like + log_prior
 
-            #print('log prior:', log_prior[0])
-            #print('log like:', log_like[0])
+            # print('log prior:', log_prior[0])
+            # print('log like:', log_like[0])
 
         else:
 
@@ -1435,19 +1528,19 @@ class Lightning:
 
         ob_mask = np.full((Nmodels, len(self.model_components)), False)
 
-        sfh_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = self._separate_params(params)
+        sfh_params, stellar_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = self._separate_params(params)
 
-        p = [sfh_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params]
+        p = [sfh_params, stellar_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params]
 
         for i in np.arange(len(self.model_components)):
             mod = self.model_components[i]
-            if mod is not None:
+            if (mod is not None) and (mod.Nparams != 0):
                 ob_mask[:,i] = np.any(mod._check_bounds(p[i]), axis=1)
 
         return np.any(ob_mask, axis=1)
 
 
-    def _fit_emcee(self, p0, Nwalkers=64, Nsteps=20000, progress=True, **kwargs):
+    def _fit_emcee(self, p0, Nwalkers=64, Nsteps=20000, progress=True, check_init=True, **kwargs):
         '''
         Helper function to fit with emcee
         '''
@@ -1493,6 +1586,12 @@ class Lightning:
         #log_prob_func = lambda x: self.get_model_log_prob(x[:self.Nsteps], x[self.Nsteps:], negative=False)
 
         #N_burn = kwargs['N_burn']
+
+        if check_init:
+            logprob_init = self.get_model_log_prob(p0, priors=priors, negative=False)
+            ob_init = ~np.isfinite(logprob_init)
+            if np.any(ob_init):
+                raise ValueError('Initial state is outside prior support for %d/%d walkers. Check initialization and try again; consider intializing from priors.' % (np.count_nonzero(ob_init), len(ob_init)))
 
         sampler = emcee.EnsembleSampler(Nwalkers, Ndim - Nconst_dim, log_prob_func, vectorize=True)
 
@@ -1543,7 +1642,8 @@ class Lightning:
     #     return res
 
     def _fit_LBFGSB(self, p0, disp=False, maxiter=None,
-                    MCMC_followup=False, MCMC_kwargs={'Nwalkers':64,'Nsteps':1000,'progress':True, 'init_scale':1e-3},
+                    MCMC_followup=False, force=True,
+                    MCMC_kwargs={'Nwalkers':64,'Nsteps':1000,'progress':True, 'init_scale':1e-3},
                     **kwargs):
         '''Helper function to fit with the L-BFGS-B algorithm.
 
@@ -1563,6 +1663,10 @@ class Lightning:
             Maximum number of iterations for the minimizer. By default, this is 500 times the number of parameters.
         MCMC_followup : bool
             If `True`, perform the MCMC followup briefly described above.
+        force : bool
+            If `True`, try to do the MCMC followup even if the solver did not succesfully converge. The solver can, e.g.
+            fail if it arrives at a region of parameter space where gradient is too flat, whereas the mcmc may
+            successfully escape this region.
         MCMC_kwargs : dict
             Keywords passed through to Lightning.fit(method='emcee'), i.e. `Nwalkers` and `Nsteps`. The keyword
             `init_scale` is not passed through (yet, I'll probably change that), and is just used to initialize the MCMC
@@ -1593,7 +1697,7 @@ class Lightning:
             start = 0
             for i in np.arange(len(self.model_components)):
                 mod = self.model_components[i]
-                if mod is not None:
+                if (mod is not None) and (mod.Nparams != 0):
                     end = start + mod.Nparams
                     param_bounds = mod.param_bounds
                     default_bounds[start:end, :] = param_bounds
@@ -1618,7 +1722,9 @@ class Lightning:
                        options={'disp': disp,
                                 'maxiter': maxiter})
 
-        if (res.success and MCMC_followup):
+        do_followup = (res.success and MCMC_followup) or (MCMC_followup and force)
+
+        if (do_followup):
             from lightning.priors import UniformPrior
             import emcee
             rng = np.random.default_rng()
@@ -1804,6 +1910,7 @@ class Lightning:
                 'flux_obs': self._flux_obs.tolist() if self._flux_obs is not None else None,
                 'flux_obs_unc': self._flux_unc.tolist() if self._flux_unc is not None else None,
                 'wave_grid': self.wave_grid_rest.tolist(),
+                'stellar_type': self.stellar_type,
                 'SFH_type': self.SFH_type,
                 'ages': self.ages.tolist(),
                 'atten_type': self.atten_type,
@@ -1871,6 +1978,7 @@ class Lightning:
                         flux_obs=config['flux_obs'],
                         flux_obs_unc=config['flux_obs_unc'],
                         wave_grid=np.array(config['wave_grid']),
+                        stellar_type=config['stellar_type'],
                         SFH_type=config['SFH_type'],
                         ages=ages,
                         atten_type=config['atten_type'],

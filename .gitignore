@@ -10,10 +10,19 @@ testbench.ipynb
 *_chains.npy
 *_output.npy
 *.pickle
+*.pkl
 *.py~
 
+tests/*.h5
+tests/tests.err
+tests/tests.out
+
 BPASS_imf135_300.tar.gz
+BPASS_imf_chab300_fullgrid_ng.h5*
+PEGASE_imf_kroupa01_fullgrid_ng.h5*
 
 lightning/recycling_bin/
 
 docs/build
+
+IZw18*

@@ -242,48 +242,48 @@ def postprocess_catalog(res_filenames,
 
     This script uses h5py to produce an output file in HDF5 format. I've made this choice to allow for
     non-homogeneous model setups, e.g. different numbers of bandpasses and parameters per source.
-    The structure and content of the HDF5 file is as follows (for each source):
+    The structure and content of the HDF5 file is as follows (for each source)::
 
-    └──sourcename
-        ├── mcmc
-        │   ├── logprob_samples (Nsamples)
-        │   └── samples (Nsamples, Nparams)
-        ├── parameters
-        │   ├── modelname
-        │   │   └── parametername
-        │   │       ├── best ()
-        │   │       ├── hi ()
-        │   │       ├── lo ()
-        │   │       └── med ()
-        └── properties
-            ├── filter_labels (Nfilters)
-            ├── lnu (Nfilters)
-            ├── lnu_unc (Nfilters)
-            ├── lumdist ()
-            ├── mstar
-            │   ├── best ()
-            │   ├── hi ()
-            │   ├── lo ()
-            │   └── med ()
-            ├── redshift ()
-            └── pvalue ()
+        └──sourcename
+            ├── mcmc
+            │   ├── logprob_samples (Nsamples)
+            │   └── samples (Nsamples, Nparams)
+            ├── parameters
+            │   ├── modelname
+            │   │   └── parametername
+            │   │       ├── best ()
+            │   │       ├── hi ()
+            │   │       ├── lo ()
+            │   │       └── med ()
+            └── properties
+                ├── filter_labels (Nfilters)
+                ├── lnu (Nfilters)
+                ├── lnu_unc (Nfilters)
+                ├── lumdist ()
+                ├── mstar
+                │   ├── best ()
+                │   ├── hi ()
+                │   ├── lo ()
+                │   └── med ()
+                ├── redshift ()
+                └── pvalue ()
 
     The "modelname" and "parametername" groups under the "parameters" group repeat for every model
     and parameter. For piecewise-constant SFHs the "properties" group also contains the age bin edges
     for the SFH. Quantiles ("*/lo" and "*/hi") are computed at the 16 and 84th percentile.
 
-    For solver_mode='mcmc', the chains are also expected to be in HDF5 format, with the following structure:
+    For solver_mode='mcmc', the chains are also expected to be in HDF5 format, with the following structure::
 
-    mcmc
-    ├── logprob_samples (Nsamples)
-    ├── samples (Nsamples, Nparams)
-    └── autocorr (Nparams)
+        mcmc
+        ├── logprob_samples (Nsamples)
+        ├── samples (Nsamples, Nparams)
+        └── autocorr (Nparams)
 
-    Whereas for solver_mode='mle', the results are expected to be formated as:
+    Whereas for solver_mode='mle', the results are expected to be formated as::
 
-    res
-    ├── bestfit (Nparams)
-    └── chi2_best ()
+        res
+        ├── bestfit (Nparams)
+        └── chi2_best ()
 
 
     I'll provide a function to make such HDF5 result files soon if I haven't already.
@@ -311,9 +311,9 @@ def postprocess_catalog(res_filenames,
     Notes
     -----
     TODO:
+
     - Allow user-supplied quantiles.
-    - Add additional properties; allow user specification of properties? That might be a whole
-      chore.
+    - Add additional properties; allow user specification of properties? That might be a whole chore.
 
     '''
 

@@ -31,7 +31,7 @@ def corner_plot(lgh, samples, **kwargs):
 
     param_labels = []
     for mod in lgh.model_components:
-        if mod is not None:
+        if (mod is not None) and (mod.Nparams != 0):
             param_labels = param_labels + mod.param_names_fncy
 
     param_labels = np.array(param_labels)

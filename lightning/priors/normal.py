@@ -4,7 +4,7 @@ from .base import AnalyticPrior
 
 class NormalPrior(AnalyticPrior):
     '''
-        Normal prior.
+    Normal prior.
     '''
 
     type = 'analytic'
@@ -46,4 +46,3 @@ class NormalPrior(AnalyticPrior):
         x = mu + sigma * np.sqrt(2) * erfinv(2 * q - 1)
 
         return x
-        
