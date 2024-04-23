@@ -22,12 +22,12 @@ class ConstantPrior(AnalyticPrior):
 
     def evaluate(self, x):
 
-        return (self.params == x).astype('int')
+        return (self.val == x).astype('int')
 
     def quantile(self, q):
 
-        return self.params + np.zeros_like(q)
+        return self.val + np.zeros_like(q)
 
-    def sample(self, q):
+    def sample(self, size):
 
-        return self.params + np.zeros_like(q)
+        return self.val + np.zeros(size)
