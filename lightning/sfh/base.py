@@ -269,6 +269,11 @@ class PiecewiseConstSFH:
         # The input array might be a spectrum, with shape (Nages, Nwave),
         # or a multidimensional model with shape (Nmodels, Nages, Nwave)
         # so we handle these different cases.
+
+        # What about if the input is just (Nmodels, Nages)?
+        # For some reason I didn't imagine that possibility.
+        # When it comes up in the X-ray model I just handle it bespoke.
+
         input_dims = len(arr.shape)
         if (input_dims == 1) or (input_dims == 0):
             #output_dims = 2

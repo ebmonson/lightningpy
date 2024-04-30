@@ -356,6 +356,10 @@ class PEGASEModel(BaseEmissionModel):
             self.nu_grid_obs = self.nu_grid_rest * (1 + self.redshift)
             self.Lnu_obs = lnu_age
 
+    def get_mstar_coeff(self, Z):
+
+        finterp_mstar = interp1d(self.Zmet, self.mstar, axis=1)
+        return finterp_mstar(Z).T
 
     def get_model_lnu_hires(self, sfh, sfh_param, params, exptau=None, exptau_youngest=None, stepwise=False):
         '''Construct the high-res stellar spectrum.
@@ -899,6 +903,11 @@ class PEGASEModelA24(BaseEmissionModel):
             self.nu_grid_rest = nu_model
             self.nu_grid_obs = self.nu_grid_rest * (1 + self.redshift)
             self.Lnu_obs = lnu_age
+
+    def get_mstar_coeff(self, Z):
+
+        finterp_mstar = interp1d(self.Zmet, self.mstar, axis=1)
+        return finterp_mstar(Z).T
 
     def get_model_lnu_hires(self, sfh, sfh_param, params, exptau=None, exptau_youngest=None, stepwise=False):
         '''Construct the high-res stellar spectrum.

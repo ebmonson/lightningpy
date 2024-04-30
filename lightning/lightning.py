@@ -943,7 +943,7 @@ class Lightning:
 
         if (self.xray_stellar_em is not None):
             lnu_abs_tmp, lnu_unabs_tmp = self.xray_stellar_em.get_model_lnu_hires(st_xray_params,
-                                                                                  self.stars,
+                                                                                  self.stars, stellar_params,
                                                                                   self.sfh, sfh_params,
                                                                                   exptau=(expminustau_gal[None,:] * expminustau_stellar))
 
@@ -1081,7 +1081,7 @@ class Lightning:
 
             if (self.xray_stellar_em is not None):
                 lnu_xray_stellar_abs, lnu_xray_stellar_unabs = self.xray_stellar_em.get_model_lnu_hires(st_xray_params,
-                                                                                                        self.stars,
+                                                                                                        self.stars, stellar_params,
                                                                                                         self.sfh, sfh_params,
                                                                                                         exptau=(expminustau_gal[None,:] * expminustau_stellar))
                 hires_models['xray_stellar_absorbed'] = lnu_xray_stellar_abs
@@ -1229,9 +1229,9 @@ class Lightning:
 
         if (self.xray_stellar_em is not None):
             lnu_abs_tmp, lnu_unabs_tmp = self.xray_stellar_em.get_model_lnu(st_xray_params,
-                                                                self.stars,
-                                                                self.sfh, sfh_params,
-                                                                exptau=(expminustau_gal[None,:] * expminustau_stellar))
+                                                                            self.stars, stellar_params,
+                                                                            self.sfh, sfh_params,
+                                                                            exptau=(expminustau_gal[None,:] * expminustau_stellar))
             lnu_xray_unabs += lnu_unabs_tmp
             lnu_xray_abs += lnu_abs_tmp
 
@@ -1310,7 +1310,7 @@ class Lightning:
 
         if (self.xray_stellar_em is not None):
             counts_abs_tmp = self.xray_stellar_em.get_model_counts(st_xray_params,
-                                                                   self.stars,
+                                                                   self.stars, stellar_params,
                                                                    self.sfh, sfh_params,
                                                                    exptau=(expminustau_gal[None,:] * expminustau_stellar))
             #counts_xray_unabs += counts_unabs_tmp

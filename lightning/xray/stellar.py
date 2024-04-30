@@ -4,7 +4,7 @@ from scipy.integrate import trapz
 
 from .plaw import plaw_expcut, XrayPlawExpcut
 
-def gilbertson22_L2_10(stellar_model, sfh, sfh_params):
+def gilbertson22_L2_10(stellar_model, stellar_params, sfh, sfh_params):
     '''Stellar-age parameterization of the X-ray luminosity.
 
     From Gilbertson et al. (2022).
@@ -12,6 +12,7 @@ def gilbertson22_L2_10(stellar_model, sfh, sfh_params):
 
     age = np.array(sfh.age)
     Nmodels = sfh_params.shape[0]
+    Z = stellar_params[:,0]
 
     if (sfh.type == 'piecewise'):
 
@@ -33,18 +34,28 @@ def gilbertson22_L2_10(stellar_model, sfh, sfh_params):
     loggamma_HMXB = -0.24 * (tau_age - 5.23) ** 2 + 32.54
 
     # Converted to L in Lsun as a function of time
-    L_LMXB_tau = 10**(loggamma_LMXB + np.log10(stellar_model.mstar) - np.log10(Lsun))# - np.log10(dnu_2_10)
-    L_HMXB_tau = 10**(loggamma_HMXB + np.log10(stellar_model.mstar) - np.log10(Lsun))# - np.log10(dnu_2_10)
+    L_LMXB_tau = 10**(loggamma_LMXB[None,:] + np.log10(stellar_model.get_mstar_coeff(Z)) - np.log10(Lsun))# - np.log10(dnu_2_10)
+    L_HMXB_tau = 10**(loggamma_HMXB[None,:] + np.log10(stellar_model.get_mstar_coeff(Z)) - np.log10(Lsun))# - np.log10(dnu_2_10)
 
     if (sfh.type == 'piecewise'):
 
-        L_LMXB = sfh.sum(sfh_params, L_LMXB_tau)
-        L_HMXB = sfh.sum(sfh_params, L_HMXB_tau)
+        sfh_arr = sfh.evaluate(sfh_params).reshape(Nmodels,-1)
+
+        L_LMXB = np.sum(sfh_arr * L_LMXB_tau, axis=1)
+        L_HMXB = np.sum(sfh_arr * L_HMXB_tau, axis=1)
+
+        # L_LMXB = sfh.sum(sfh_params, L_LMXB_tau)
+        # L_HMXB = sfh.sum(sfh_params, L_HMXB_tau)
 
     else:
 
-        L_LMXB = sfh.integrate(sfh_params, L_LMXB_tau)
-        L_HMXB = sfh.integrate(sfh_params, L_HMXB_tau)
+        sfh_arr = sfh.evaluate(sfh_params).reshape(Nmodels,-1)
+
+        L_LMXB = trapz(sfh_arr * L_LMXB_tau, axis=1)
+        L_HMXB = trapz(sfh_arr * L_HMXB_tau, axis=1)
+
+        # L_LMXB = sfh.integrate(sfh_params, L_LMXB_tau)
+        # L_HMXB = sfh.integrate(sfh_params, L_HMXB_tau)
 
     if (Nmodels == 1):
         # promote to 1-length arrays from scalars
@@ -71,7 +82,7 @@ class StellarPlaw(XrayPlawExpcut):
     param_names_fncy = [r'$\Gamma_{\rm XRB}$']
     param_bounds = np.array([[-2.0, 9.0]])
 
-    def get_model_lnu_hires(self, params, stellar_model, sfh, sfh_params, exptau=None):
+    def get_model_lnu_hires(self, params, stellar_model, stellar_params, sfh, sfh_params, exptau=None):
         '''Construct the high-resolution spectrum in Lnu.
 
         This function takes in the stellar and SFH models in order to use the
@@ -138,7 +149,7 @@ class StellarPlaw(XrayPlawExpcut):
         E_cut = np.full(Nmodels, 100)
         hplanck = 4.136e-18 # keV s
 
-        L_LMXB, L_HMXB = gilbertson22_L2_10(stellar_model, sfh, sfh_params)
+        L_LMXB, L_HMXB = gilbertson22_L2_10(stellar_model, stellar_params, sfh, sfh_params)
         # Recast the rest-frame 2-10 keV luminosity in terms of the normalization.
         # This is more-or-less correct (but not exactly correct) since the
         # exponential cutoff energy is fairly large compared to the bandpass.
@@ -162,7 +173,7 @@ class StellarPlaw(XrayPlawExpcut):
 
         return lnu_abs, lnu
 
-    def get_model_countrate_hires(self, params, stellar_model, sfh, sfh_params, exptau=None):
+    def get_model_countrate_hires(self, params, stellar_model, stellar_params, sfh, sfh_params, exptau=None):
         '''Construct the high-resolution countrate-density spectrum.
 
         This function takes in the stellar and SFH models in order to use the
@@ -212,7 +223,7 @@ class StellarPlaw(XrayPlawExpcut):
 
         # We discard the intrinsic lnu since the 'unabsorbed count-rate' is not really
         # used for anything.
-        lnu_obs, _ = self.get_model_lnu_hires(params, stellar_model, sfh, sfh_params, exptau=exptau)
+        lnu_obs, _ = self.get_model_lnu_hires(params, stellar_model, stellar_params, sfh, sfh_params, exptau=exptau)
 
         if (Nmodels == 1):
             lnu_obs = lnu_obs.reshape(1,-1)
@@ -229,7 +240,7 @@ class StellarPlaw(XrayPlawExpcut):
 
         return countrate
 
-    def get_model_lnu(self, params, stellar_model, sfh, sfh_params, exptau=None):
+    def get_model_lnu(self, params, stellar_model, stellar_params, sfh, sfh_params, exptau=None):
         '''Construct the bandpass-convolved SED in Lnu.
 
         This function takes in the stellar and SFH models in order to use the
@@ -274,7 +285,7 @@ class StellarPlaw(XrayPlawExpcut):
         if(np.any(ob)):
             raise ValueError('Given parameters are out of bounds for this model (%s).' % (self.model_name))
 
-        lnu_obs, lnu_intr = self.get_model_lnu_hires(params, stellar_model, sfh, sfh_params, exptau=exptau)
+        lnu_obs, lnu_intr = self.get_model_lnu_hires(params, stellar_model, stellar_params, sfh, sfh_params, exptau=exptau)
 
         if (Nmodels == 1):
             lnu_obs = lnu_obs.reshape(1,-1)
@@ -291,7 +302,7 @@ class StellarPlaw(XrayPlawExpcut):
 
         return lmod, lmod_intr
 
-    def get_model_countrate(self, params, stellar_model, sfh, sfh_params, exptau=None):
+    def get_model_countrate(self, params, stellar_model, stellar_params, sfh, sfh_params, exptau=None):
         '''Construct the bandpass-convolved SED in count-rate.
 
         This function takes in the stellar and SFH models in order to use the
@@ -339,7 +350,7 @@ class StellarPlaw(XrayPlawExpcut):
         if(np.any(ob)):
             raise ValueError('Given parameters are out of bounds for this model (%s).' % (self.model_name))
 
-        countrate_hires = self.get_model_countrate_hires(params, stellar_model, sfh, sfh_params, exptau=exptau)
+        countrate_hires = self.get_model_countrate_hires(params, stellar_model, stellar_params, sfh, sfh_params, exptau=exptau)
 
         if (Nmodels == 1):
             countrate_hires = countrate_hires.reshape(1,-1)
@@ -353,7 +364,7 @@ class StellarPlaw(XrayPlawExpcut):
 
         return countrate
 
-    def get_model_counts(self, params, stellar_model, sfh, sfh_params, exptau=None):
+    def get_model_counts(self, params, stellar_model, stellar_params, sfh, sfh_params, exptau=None):
         '''Construct the bandpass-convolved SED in counts.
 
         This function takes in the stellar and SFH models in order to use the
@@ -402,7 +413,7 @@ class StellarPlaw(XrayPlawExpcut):
             raise ValueError('Given parameters are out of bounds for this model (%s).' % (self.model_name))
 
         # This is the mean count-rate density, counts s-1 Hz-1
-        countrate = self.get_model_countrate(params, stellar_model, sfh, sfh_params, exptau=exptau)
+        countrate = self.get_model_countrate(params, stellar_model, stellar_params, sfh, sfh_params, exptau=exptau)
 
         # The counts are the width of the bandpass times the mean countrate density
         # times the exposure time. The definition of the "width" of an arbitrary bandpass
