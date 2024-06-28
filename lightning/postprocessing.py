@@ -43,19 +43,28 @@ def postprocess_catalog_mcmc(chain_filenames,
 
             source = outfile.create_group(n)
 
-            source.create_dataset('mcmc/samples', data=samples, compression='gzip')
-            source.create_dataset('mcmc/logprob_samples', data=logprob_samples, compression='gzip')
-
             if (model_mode == 'json'):
                 lgh = Lightning.from_json(mf)
             elif (model_mode == 'pickle'):
                 with open(mf, 'rb') as f:
                     lgh = pickle.load(f)
 
+            if (len(samples.shape) == 0 and np.isnan(samples)) or np.all(np.isnan(samples)):
+                samples = np.nan + np.zeros((1,lgh.Nparams))
+                logprob_samples = np.nan + np.zeros((1,))
+                compression = None
+                skip = True
+            else:
+                compression = 'gzip'
+                skip = False
+
+            source.create_dataset('mcmc/samples', data=samples, compression=compression)
+            source.create_dataset('mcmc/logprob_samples', data=logprob_samples, compression=compression)
+
             bestfit = np.argmax(logprob_samples)
 
             ##### PARAMETERS
-            sfh_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = lgh._separate_params(samples)
+            sfh_params, stellar_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = lgh._separate_params(samples)
             parameters = source.create_group('parameters')
             if (sfh_params is not None):
                 for j,pname in enumerate(lgh.sfh.param_names):
@@ -65,6 +74,14 @@ def postprocess_catalog_mcmc(chain_filenames,
                     parameters.create_dataset('sfh/%s/med' % (pname), data=p_quant[1])
                     parameters.create_dataset('sfh/%s/hi' % (pname), data=p_quant[2])
                     parameters.create_dataset('sfh/%s/best' % (pname), data=p_best)
+            if (stellar_params is not None):
+                for j,pname in enumerate(lgh.stars.param_names):
+                    p_quant = np.nanquantile(stellar_params[:,j], q=(0.16, 0.50, 0.84))
+                    p_best = stellar_params[bestfit, j]
+                    parameters.create_dataset('stellar/%s/lo' % (pname), data=p_quant[0])
+                    parameters.create_dataset('stellar/%s/med' % (pname), data=p_quant[1])
+                    parameters.create_dataset('stellar/%s/hi' % (pname), data=p_quant[2])
+                    parameters.create_dataset('stellar/%s/best' % (pname), data=p_best)
             if (atten_params is not None):
                 for j,pname in enumerate(lgh.atten.param_names):
                     p_quant = np.nanquantile(atten_params[:,j], q=(0.16, 0.50, 0.84))
@@ -136,7 +153,11 @@ def postprocess_catalog_mcmc(chain_filenames,
             properties.create_dataset('mstar/hi', data=mstar_q[2])
             properties.create_dataset('mstar/best', data=mstar[bestfit])
 
-            pvalue,_,_ = ppc(lgh, samples, logprob_samples)
+            if (skip):
+                pvalue = np.nan
+            else:
+                pvalue,_,_ = ppc(lgh, samples, logprob_samples)
+
 
             properties.create_dataset('pvalue', data=pvalue)
 
