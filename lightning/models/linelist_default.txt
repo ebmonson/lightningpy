@@ -1,0 +1,10 @@
+# Default linelist - common diagnostic lines, plus He II for fun
+H__1_486132A
+O__3_495891A
+O__3_500684A
+O__1_636378A
+H__1_656280A
+S__2_671644A
+S__2_673082A
+HE_2_164041A
+HE_2_468568A

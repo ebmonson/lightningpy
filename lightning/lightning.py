@@ -17,6 +17,7 @@
 import time
 import warnings
 import numbers
+from pathlib import Path
 # Scipy/numpy
 import numpy as np
 from scipy.integrate import trapz
@@ -142,6 +143,8 @@ class Lightning:
                  flux_obs=None, flux_obs_unc=None,
                  wave_grid=(0.1, 1000, 1200),
                  stellar_type='PEGASE',
+                 line_labels=None,
+                 line_flux=None, line_flux_unc=None,
                  nebula_lognH=2.0,
                  SFH_type='Piecewise-Constant', ages=None,
                  atten_type='Modified-Calzetti',
@@ -213,6 +216,31 @@ class Lightning:
             self.Lnu_unc = None
         else:
             self.flux_unc = flux_obs_unc
+
+        # ... and line fluxes
+        if (line_labels is None) or (line_labels == 'default'):
+            path_to_linelist = str(Path(__file__).parent.resolve()) + '/models/'
+            self.line_labels = np.loadtxt(path_to_linelist + 'linelist_default.txt', dtype='<U16')
+        elif (line_labels == 'full'):
+            self.line_labels = np.loadtxt(path_to_linelist + 'linelist_full.txt', dtype='<U16')
+        else:
+            self.line_labels = line_labels
+
+        if (line_flux is None):
+            self._line_flux = None
+            self.L_lines = None
+        else:
+            assert(self.line_labels is not None), 'Line labels must be provided to fit line fluxes.'
+            # self.line_labels = line_labels
+            self.line_flux = line_flux
+
+        if (line_flux_unc is None):
+            self._line_flux_unc = None
+            self.L_lines_unc = None
+        else:
+            assert(self.line_labels is not None), 'Line labels must be provided to fit line fluxes.'
+            # self.line_labels = line_labels
+            self.line_flux_unc = line_flux_unc
 
         # Model uncertainty - either a scalar or an array
         # with one entry per filter.
@@ -519,6 +547,55 @@ class Lightning:
 
         self.Lnu_unc = Lnu_unc
 
+    @property
+    def line_flux(self):
+        '''Observed line fluxes in erg cm-2 s-1.
+
+        Fluxes are converted to apparent luminosities.
+        '''
+        return self._line_flux
+
+    @line_flux.setter
+    def line_flux(self, flux):
+
+        flux = np.array(flux)
+        flux_shape = flux.shape
+        if (len(flux_shape) > 1):
+            # Then the second column should be the uncertainties
+            if (flux_shape[1] != 2):
+                raise ValueError('If flux is 2D it should have shape (Nlines,2) where the second column contains the uncertainties.')
+
+            if (flux_shape[0] != len(self.line_labels)):
+                raise ValueError('Number of observed fluxes (%d) must correspond to number of lines in model (%d).' % (flux_shape[0], len(self.line_labels)))
+
+            self._line_flux = flux[:,0]
+            self.line_flux_unc = flux[:,1]
+        else:
+            if (len(flux) != len(self.line_labels)):
+                raise ValueError('Number of observed fluxes (%d) must correspond to number of lines in model (%d).' % (len(flux), len(self.line_labels)))
+
+            self._line_flux = flux
+
+        self.L_lines = self._f_to_L(self.line_flux)
+
+    @property
+    def line_flux_unc(self):
+        '''Observed line fluxes in erg cm-2 s-1.
+
+        Fluxes are converted to apparent luminosities.
+        '''
+        return self._line_flux_unc
+
+    @line_flux_unc.setter
+    def line_flux_unc(self, flux_unc):
+
+        flux_unc = np.array(flux_unc)
+        if (len(flux_unc) != len(self.line_labels)):
+            raise ValueError('Number of flux uncertainties (%d) must correspond to number of filters in model (%d).' % (len(flux_unc), len(self.line_labels)))
+
+        self._line_flux_unc = flux_unc
+
+        self.L_lines_unc = self._f_to_L(self.line_flux_unc)
 
     def _fnu_to_Lnu(self, flux):
         '''
@@ -533,6 +610,17 @@ class Lightning:
 
         return FtoL * flux
 
+    def _f_to_L(self, flux):
+        '''
+        Helper function to convert f in erg cm-2 s-1 to L in Lsun.
+        '''
+
+        Mpc_to_cm = u.Mpc.to(u.cm)
+        cgs_to_Lsun = (u.erg / u.s).to(u.solLum)
+
+        FtoL = 4 * np.pi * (self.DL * Mpc_to_cm) ** 2 * cgs_to_Lsun
+
+        return FtoL * flux
 
     def _get_filters(self):
         '''
@@ -1162,16 +1250,28 @@ class Lightning:
 
     def get_model_lines(self, params, stepwise=False):
 
+        param_shape = params.shape # expecting ndarray(Nmodels, Nparams)
+
+        if (len(param_shape) == 1):
+            params = params.reshape(1, params.size)
+            param_shape = params.shape
+        Nmodels = param_shape[0]
+
         sfh_params, stellar_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = self._separate_params(params)
 
+        # Interpolate attenuation at wavelength of lines
+        expminustau = self.atten.evaluate(atten_params)
+        expminustau = expminustau.reshape(Nmodels, -1)
 
+        finterp = interp1d(self.wave_grid_rest, expminustau, axis=1)
+        expminustau_lines = finterp(self.stars.wave_lines)
 
         if (self.SFH_type != 'Burst'):
-            lines = self.stars.get_model_lines(self.sfh, sfh_params, stellar_params)
+            lines_ext, lines = self.stars.get_model_lines(self.sfh, sfh_params, stellar_params, exptau=expminustau_lines)
         else:
-            lines = self.stars.get_model_lines(stellar_params)
+            lines_ext, lines = self.stars.get_model_lines(stellar_params, exptau=expminustau_lines)
 
-        return lines
+        return lines_ext, lines
 
     def get_xray_model_lnu(self, params):
         '''Construct the low-resolution X-ray SED model.
