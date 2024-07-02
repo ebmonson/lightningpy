@@ -662,12 +662,17 @@ class PEGASEModelA24(BaseEmissionModel):
         cannot be applied.
     nebular_effects : bool
         If ``True``, the spectra will include nebular extinction, continua, and lines.
+    line_labels : np.ndarray, (Nlines,), string, optional
+        Line labels in the format used by pyCloudy. See `lightning/models/linelist_full.txt` for the
+        complete list of lines in the grid and their format.
     nebula_old : bool
         If ``True``, the spectra will include nebular extinction and emission at ages older than 50 Myr, modeling
         the nebular contributions of the hot, stripped cores of evolved massive stars. While the the conditions we assume
         for the nebula are most appropriate for massive H II regions, Byler+(2017) found that nebular emission from
         post-AGB stars is not super sensitive to the geometry/density of the nebula, but it may be worth fitting your
         galaxies with and without this component if you're concerned.
+    dust_grains : bool
+        If ``True``, then dust grains are included in the Cloudy grids. (Default: False)
     wave_grid : np.ndarray, (Nwave,), float, optional
         If set, the spectra are interpreted to this wavelength grid.
 
@@ -707,7 +712,11 @@ class PEGASEModelA24(BaseEmissionModel):
             them in bins (if ``step==True``) or interpolate them to an age grid otherwise.
         '''
         self.path_to_linelist = self.path_to_models
-        self.path_to_models = self.path_to_models + 'PEGASE/Cloudy/imf_kroupa01/' + 'PEGASE_imf_kroupa01_fullgrid_ng.h5'
+        if dust_grains:
+            self.path_to_models = self.path_to_models + 'PEGASE/Cloudy/imf_kroupa01/' + 'PEGASE_imf_kroupa01_fullgrid_g.h5'
+        else:
+            self.path_to_models = self.path_to_models + 'PEGASE/Cloudy/imf_kroupa01/' + 'PEGASE_imf_kroupa01_fullgrid_ng.h5'
+
         f = h5py.File(self.path_to_models)
 
         self.Zmet = f['Zstars'][:]
@@ -1238,7 +1247,7 @@ class PEGASEBurstA24(PEGASEModelA24):
     '''
 
     def __init__(self, filter_labels, redshift, wave_grid=None, age=None, lognH=2.0, cosmology=None,
-                 line_labels=None):
+                 line_labels=None, dust_grains=False):
 
         if cosmology is None:
             from astropy.cosmology import FlatLambdaCDM
@@ -1247,7 +1256,7 @@ class PEGASEBurstA24(PEGASEModelA24):
         univ_age = cosmology.age(redshift).value * 1e9
 
         super().__init__(filter_labels, redshift, step=False, wave_grid=wave_grid, age=age, lognH=lognH, cosmology=cosmology,
-                         line_labels=line_labels)
+                         line_labels=line_labels, dust_grains=dust_grains)
 
         # Overwrite parameters for clarity
         self.nebular = True # Why wouldn't you

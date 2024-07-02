@@ -20,6 +20,8 @@ tests/tests.out
 BPASS_imf135_300.tar.gz
 BPASS_imf_chab300_fullgrid_ng.h5*
 PEGASE_imf_kroupa01_fullgrid_ng.h5*
+BPASS_imf_chab300_fullgrid_g.h5*
+PEGASE_imf_kroupa01_fullgrid_g.h5*
 
 lightning/recycling_bin/
 

@@ -71,8 +71,24 @@ class Lightning:
     wave_grid : tuple (3,), or np.ndarray, (Nwave,), float32, optional
         Either a tuple specifying a log-spaced wavelength grid, or an array
         giving the wavelengths.
-    stellar_type : {'PEGASE', 'BPASS', 'BPASS-A24'}
+    stellar_type : {'PEGASE', 'PEGASE-A24', 'BPASS', 'BPASS-A24'}
         String specifying the simple stellar population models to use.
+    line_labels : np.ndarray, (Nlines,), string, optional
+        Line labels in the format used by pyCloudy. See `lightning/models/linelist_full.txt` for the
+        complete list of lines in the grid and their format.
+    line_flux : np.ndarray, (Nlines,) or (Nlines, 2), float32, optional
+        Observed integrated fluxes of the lines in erg cm-2 s-1 (unless the ``line_index`` keyword is set, in which
+        case they should be normalized by the appropriate line). CURRENTLY UNUSED
+    line_flux_unc : np.ndarray,(Nlines,), float32, optional
+        Uncertainties on the integrated line fluxes in erg cm-2 s-1 (unless ``line_index`` is set, see above)
+    line_index : string
+        Label for the line to index the line fluxes by. You would normally want this to be ``'H__1_486132A'`` or
+        ``'H__1_656280A'`` for Hbeta and Halpha, respectively, but the highest SNR line would be a good choice.
+        If this is set to ``None`` then the model line fluxes are not normalized for fitting.
+    nebula_lognH : float
+        log of the Hydrogen density in cm-3 for the Cloudy grids. (Default: 2.0)
+    nebula_dust : bool
+        If ``True``, then dust grains are included in the Cloudy grids. (Default: False)
     SFH_type : {'Piecewise-Constant', 'Delayed-Exponential'}
         String specifying the SFH type to use.
     ages : np.ndarray, (Nages,), float32
@@ -145,7 +161,7 @@ class Lightning:
                  stellar_type='PEGASE',
                  line_labels=None,
                  line_flux=None, line_flux_unc=None,
-                 nebula_lognH=2.0,
+                 nebula_lognH=2.0, nebula_dust=False,
                  SFH_type='Piecewise-Constant', ages=None,
                  atten_type='Modified-Calzetti',
                  dust_emission=False,
@@ -353,6 +369,7 @@ class Lightning:
 
                 self.Nages = len(self.ages)
 
+        self.nebula_dust = nebula_dust
         allowed_stars = ['PEGASE', 'PEGASE-A24', 'BPASS', 'BPASS-A24']
         if stellar_type not in allowed_stars:
             print('Allowed simple stellar population models are:', allowed_stars)
@@ -658,12 +675,14 @@ class Lightning:
                 self.stars = PEGASEBurstA24(self.filter_labels, self.redshift, age=self.ages,
                                             cosmology=self.cosmology,
                                             lognH=nebula_lognH,
-                                            wave_grid=self.wave_grid_rest)
+                                            wave_grid=self.wave_grid_rest,
+                                            dust_grains=self.nebula_dust)
             else:
                 self.stars = PEGASEModelA24(self.filter_labels, self.redshift, age=self.ages,
                                            step=step, cosmology=self.cosmology,
                                            lognH=nebula_lognH,
-                                           wave_grid=self.wave_grid_rest)
+                                           wave_grid=self.wave_grid_rest,
+                                           dust_grains=self.nebula_dust)
 
         elif (self.stellar_type == 'BPASS'):
             self.stars = BPASSModel(self.filter_labels, self.redshift, age=self.ages,
@@ -674,12 +693,14 @@ class Lightning:
                 self.stars = BPASSBurstA24(self.filter_labels, self.redshift, age=self.ages,
                                             cosmology=self.cosmology,
                                             lognH=nebula_lognH,
-                                            wave_grid=self.wave_grid_rest)
+                                            wave_grid=self.wave_grid_rest,
+                                            dust_grains=self.nebula_dust)
             else:
                 self.stars = BPASSModelA24(self.filter_labels, self.redshift, age=self.ages,
                                            step=step, cosmology=self.cosmology,
                                            lognH=nebula_lognH,
-                                           wave_grid=self.wave_grid_rest)
+                                           wave_grid=self.wave_grid_rest,
+                                           dust_grains=self.nebula_dust)
         else:
             raise ValueError("Stellar type '%s' not understood." % (self.stellar_type))
 
