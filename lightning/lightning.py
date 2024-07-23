@@ -161,6 +161,7 @@ class Lightning:
                  stellar_type='PEGASE',
                  line_labels=None,
                  line_flux=None, line_flux_unc=None,
+                 line_index=None,
                  nebula_lognH=2.0, nebula_dust=False,
                  SFH_type='Piecewise-Constant', ages=None,
                  atten_type='Modified-Calzetti',
@@ -179,6 +180,7 @@ class Lightning:
                  lightning_filter_path=None,
                  print_setup_time=False,
                  model_unc=None,
+                 model_unc_lines=None,
                  cosmology=None,
                  uplim_handling='exact'):
 
@@ -234,13 +236,17 @@ class Lightning:
             self.flux_unc = flux_obs_unc
 
         # ... and line fluxes
-        if (line_labels is None) or (line_labels == 'default'):
+        if (line_labels is None) or (str(line_labels) == 'default'):
             path_to_linelist = str(Path(__file__).parent.resolve()) + '/models/'
             self.line_labels = np.loadtxt(path_to_linelist + 'linelist_default.txt', dtype='<U16')
-        elif (line_labels == 'full'):
+        elif (str(line_labels) == 'full'):
             self.line_labels = np.loadtxt(path_to_linelist + 'linelist_full.txt', dtype='<U16')
         else:
-            self.line_labels = line_labels
+            self.line_labels = np.array(line_labels)
+
+        self.line_index = line_index
+        if self.line_index is not None:
+            assert (self.line_index in self.line_labels), 'Normalizing line must be in current line list.'
 
         if (line_flux is None):
             self._line_flux = None
@@ -273,6 +279,23 @@ class Lightning:
                 assert (np.all(model_unc < 1)), "All elements of 'model_unc' should be numbers less than 1."
                 assert (len(model_unc) == len(self.filter_labels)), "Length of 'model_unc' (%d) must match length of 'filter_labels' (%d)" % (len(model_unc), len(self.filter_labels))
                 self.model_unc = model_unc
+
+        # Model uncertainty for spectral line fluxes - either a scalar or an array
+        # with one entry per filter.
+        # How does this work in the case of normalized lines? I dunno!
+        if (model_unc_lines is None):
+            self.model_unc_lines = np.zeros(len(self.line_labels))
+        else:
+            # Scalar case
+            if isinstance(model_unc_lines, numbers.Number):
+                assert (model_unc_lines < 1), "'model_unc_lines' should be a number less than 1."
+                self.model_unc_lines = np.full(len(self.line_labels), model_unc_lines)
+            # If it's not a scalar, assume it's a vector
+            else:
+                model_unc_lines = np.array(model_unc_lines).flatten()
+                assert (np.all(model_unc_lines < 1)), "All elements of 'model_unc_lines' should be numbers less than 1."
+                assert (len(model_unc_lines) == len(self.line_labels)), "Length of 'model_unc_lines' (%d) must match length of 'line_labels' (%d)" % (len(model_unc), len(self.filter_labels))
+                self.model_unc_lines = model_unc_lines
 
         if (uplim_handling not in ['exact', 'approx']):
             raise ValueError("Options for 'uplim_handling' are 'exact' and 'approx'.")
@@ -357,8 +380,6 @@ class Lightning:
                 # This is not the ideal age grid for the stellar population models, and the choice of the ideal
                 # grid is non-trivial. The best we might be able to do is to fall back to the ages the models
                 # were originally generated at.
-                #self.ages = np.logspace(6, np.log10(univ_age * 1e9), 20) # Log spaced grid from 1 Myr to the age of the Universe.
-                #self.ages[-1] = (univ_age * 1e9)
                 self.ages = None # Fall back to whatever grid the SPS models have
             else:
                 self.ages = np.array(ages)
@@ -594,6 +615,10 @@ class Lightning:
             self._line_flux = flux
 
         self.L_lines = self._f_to_L(self.line_flux)
+        if self.line_index is not None:
+            self._L_line_norm = self.L_lines[self.line_labels == self.line_index]
+        else:
+            self._L_line_norm = 1
 
     @property
     def line_flux_unc(self):
@@ -613,6 +638,10 @@ class Lightning:
         self._line_flux_unc = flux_unc
 
         self.L_lines_unc = self._f_to_L(self.line_flux_unc)
+        if self.line_index is not None:
+            self._L_line_norm_unc = self.L_lines_unc[self.line_labels == self.line_index]
+        else:
+            self._L_line_norm_unc = 0
 
     def _fnu_to_Lnu(self, flux):
         '''
@@ -676,13 +705,15 @@ class Lightning:
                                             cosmology=self.cosmology,
                                             lognH=nebula_lognH,
                                             wave_grid=self.wave_grid_rest,
-                                            dust_grains=self.nebula_dust)
+                                            dust_grains=self.nebula_dust,
+                                            line_labels=self.line_labels)
             else:
                 self.stars = PEGASEModelA24(self.filter_labels, self.redshift, age=self.ages,
                                            step=step, cosmology=self.cosmology,
                                            lognH=nebula_lognH,
                                            wave_grid=self.wave_grid_rest,
-                                           dust_grains=self.nebula_dust)
+                                           dust_grains=self.nebula_dust,
+                                           line_labels=self.line_labels)
 
         elif (self.stellar_type == 'BPASS'):
             self.stars = BPASSModel(self.filter_labels, self.redshift, age=self.ages,
@@ -694,13 +725,17 @@ class Lightning:
                                             cosmology=self.cosmology,
                                             lognH=nebula_lognH,
                                             wave_grid=self.wave_grid_rest,
-                                            dust_grains=self.nebula_dust)
+                                            dust_grains=self.nebula_dust,
+                                            nebula_old=False,
+                                            line_labels=self.line_labels)
             else:
                 self.stars = BPASSModelA24(self.filter_labels, self.redshift, age=self.ages,
                                            step=step, cosmology=self.cosmology,
                                            lognH=nebula_lognH,
                                            wave_grid=self.wave_grid_rest,
-                                           dust_grains=self.nebula_dust)
+                                           dust_grains=self.nebula_dust,
+                                           nebula_old=False,
+                                           line_labels=self.line_labels)
         else:
             raise ValueError("Stellar type '%s' not understood." % (self.stellar_type))
 
@@ -1477,6 +1512,7 @@ class Lightning:
 
         '''
 
+        # Handle broad-band UV-IR data
         if ((self.Lnu_obs is None) or (self.Lnu_unc is None)):
             raise AttributeError('In order to calculate model likelihood, observed flux and uncertainty must be set.')
 
@@ -1502,6 +1538,35 @@ class Lightning:
                 chi2_undet = 0 * chi2_det
             chi2 = chi2_det + chi2_undet
 
+        # Handle lines
+        if self.L_lines is not None:
+            line_unc = self.L_lines / self._L_line_norm * np.sqrt(self.L_lines_unc ** 2 / self.L_lines**2 + \
+                                                                  self._L_line_norm_unc**2 / self._L_line_norm**2)
+
+            lines_mod, _ = self.get_model_lines(params)
+            if (len(lines_mod.shape) == 1):
+                lines_mod = lines_mod.reshape(1,-1)
+
+            if self.line_index is not None:
+                # Is this (Nmodels, 1) or (Nmodels, 0)?
+                # (Nmodels, 1) should broadcast.
+                mod_line_norm = lines_mod[:,self.line_labels == self.line_index]
+                #print(self.line_labels)
+                #print(self.line_index)
+                #print(self.line_labels == self.line_index)
+            else:
+                # (Nmodels, Nlines)
+                mod_line_norm = np.ones((lines_mod.shape[0], 1))
+
+            lines_mod /= mod_line_norm
+
+            line_unc = np.sqrt(line_unc[None,:]**2 + self.model_unc_lines[None,:]**2 * lines_mod**2)
+
+            chi2_lines = np.nansum((lines_mod - (self.L_lines / self._L_line_norm))**2 / line_unc**2, axis=-1)
+
+            chi2 += chi2_lines
+
+        # Handle X-rays
         if (self.xray_mode == 'flux'):
 
             lnu_xray, _ = self.get_xray_model_lnu(params)
@@ -2077,6 +2142,8 @@ class Lightning:
     def from_json(fname):
         '''
         Construct a Lightning object with the configuration specified by a json file.
+        This was a nice idea when the model was simple enough that it could just be
+        Lightning(**config) but now it's kind of a nightmare. Should move to binary only.
         '''
 
         import json
@@ -2100,6 +2167,11 @@ class Lightning:
                         flux_obs_unc=config['flux_obs_unc'],
                         wave_grid=np.array(config['wave_grid']),
                         stellar_type=config['stellar_type'],
+                        line_flux=config['line_flux'],
+                        line_flux_unc=config['line_flux_unc'],
+                        line_index=config['line_index'],
+                        nebula_lognH=config['nebula_lognH'],
+                        nebula_dust=config['nebula_dust'],
                         SFH_type=config['SFH_type'],
                         ages=ages,
                         atten_type=config['atten_type'],

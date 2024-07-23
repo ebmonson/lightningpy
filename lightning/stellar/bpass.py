@@ -850,9 +850,9 @@ class BPASSModelA24(BaseEmissionModel):
 
         if (nebular_effects):
 
-            if (line_labels is None) or (line_labels == 'default'):
+            if (line_labels is None) or (str(line_labels) == 'default'):
                 self.line_labels = np.loadtxt(self.path_to_linelist + 'linelist_default.txt', dtype='<U16')
-            elif line_labels == 'full':
+            elif str(line_labels) == 'full':
                 self.line_labels = np.loadtxt(self.path_to_linelist + 'linelist_full.txt', dtype='<U16')
             else:
                 self.line_labels = line_labels
