@@ -749,6 +749,11 @@ class BPASSModelA24(BaseEmissionModel):
     binaries : bool
         If ``True``, the spectra include the effects of binary stellar evolution. If ``False``, the nebular model
         cannot be applied.
+    ULX : bool
+        If ``True``, the spectra loaded will be the SXP+SSP models from Garofali+(2024), postprocessed with Cloudy
+        following the same recipe as we typically adopt (see ``lightning_models/models/BPASS_Cloudy/README.md``).
+        Note that this fixes the IMF to the BPASS `imf_135_100` adopted in Garofali+. Note that this model doesn't
+        extend fully to the X-rays yet, it just modifies the line emission due to the considerably larger Q(He II).
     nebular_effects : bool
         If ``True``, the spectra will include nebular extinction, continua, and lines.
     line_labels : np.ndarray, (Nlines,), string, optional
@@ -794,17 +799,22 @@ class BPASSModelA24(BaseEmissionModel):
     gridded = False
 
     def _construct_model(self, age=None, lognH=2.0, step=True,
-                         wave_grid=None, cosmology=None, binaries=True,
+                         wave_grid=None, cosmology=None, binaries=True, ULX=False,
                          nebular_effects=True, line_labels=None, nebula_old=True, dust_grains=False):
         '''
             Load the appropriate models from the BPASS h5 files and either integrate
             them in bins (if ``step==True``) or interpolate them to an age grid otherwise.
         '''
         self.path_to_linelist = self.path_to_models
-        if dust_grains:
-            self.path_to_models = self.path_to_models + 'BPASS_Cloudy/imf_chab300/' + 'BPASS_imf_chab300_fullgrid_g.h5'
+
+        dust_str = 'g' if dust_grains else 'ng'
+
+
+        if ULX:
+            self.path_to_models = self.path_to_models + 'BPASS_Cloudy/imf_135_100/SXP/BPASS_G24_imf135_100_fullgrid_%s.h5' % dust_str
         else:
-            self.path_to_models = self.path_to_models + 'BPASS_Cloudy/imf_chab300/' + 'BPASS_imf_chab300_fullgrid_ng.h5'
+            self.path_to_models = self.path_to_models + 'BPASS_Cloudy/imf_chab300/BPASS_imf_chab300_fullgrid_%s.h5' % dust_str
+
         f = h5py.File(self.path_to_models)
 
         self.Zmet = f['Zstars'][:]
@@ -1368,7 +1378,7 @@ class BPASSBurstA24(BPASSModelA24):
     '''
 
     def __init__(self, filter_labels, redshift, wave_grid=None, age=None, lognH=2.0, cosmology=None,
-                 line_labels=None, dust_grains=False):
+                 line_labels=None, dust_grains=False, ULX=False):
 
         if cosmology is None:
             from astropy.cosmology import FlatLambdaCDM
@@ -1378,7 +1388,7 @@ class BPASSBurstA24(BPASSModelA24):
 
         # "Erik googled how super() works after 15 years"
         super().__init__(filter_labels, redshift, step=False, wave_grid=wave_grid, age=age, lognH=lognH, cosmology=cosmology,
-                         line_labels=line_labels, dust_grains=dust_grains)
+                         line_labels=line_labels, dust_grains=dust_grains, ULX=ULX)
 
         # Overwrite parameters for clarity
         self.nebular = True # Why wouldn't you

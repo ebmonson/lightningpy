@@ -71,7 +71,7 @@ class Lightning:
     wave_grid : tuple (3,), or np.ndarray, (Nwave,), float32, optional
         Either a tuple specifying a log-spaced wavelength grid, or an array
         giving the wavelengths.
-    stellar_type : {'PEGASE', 'PEGASE-A24', 'BPASS', 'BPASS-A24'}
+    stellar_type : {'PEGASE', 'PEGASE-A24', 'BPASS', 'BPASS-A24', 'BPASS-ULX-G24'}
         String specifying the simple stellar population models to use.
     line_labels : np.ndarray, (Nlines,), string, optional
         Line labels in the format used by pyCloudy. See `lightning/models/linelist_full.txt` for the
@@ -391,7 +391,7 @@ class Lightning:
                 self.Nages = len(self.ages)
 
         self.nebula_dust = nebula_dust
-        allowed_stars = ['PEGASE', 'PEGASE-A24', 'BPASS', 'BPASS-A24']
+        allowed_stars = ['PEGASE', 'PEGASE-A24', 'BPASS', 'BPASS-A24', 'BPASS-ULX-G24']
         if stellar_type not in allowed_stars:
             print('Allowed simple stellar population models are:', allowed_stars)
             raise ValueError("Stellar type '%s' not understood." % (stellar_type))
@@ -689,6 +689,7 @@ class Lightning:
     def _setup_stellar(self, nebula_lognH):
         '''
         Initialize SFH model and stellar population.
+        TODO: Clean this up.
         '''
 
         step = 'Piecewise' in self.SFH_type
@@ -732,6 +733,25 @@ class Lightning:
                 self.stars = BPASSModelA24(self.filter_labels, self.redshift, age=self.ages,
                                            step=step, cosmology=self.cosmology,
                                            lognH=nebula_lognH,
+                                           wave_grid=self.wave_grid_rest,
+                                           dust_grains=self.nebula_dust,
+                                           nebula_old=False,
+                                           line_labels=self.line_labels)
+        elif (self.stellar_type == 'BPASS-ULX-G24'):
+            if self.SFH_type == 'Burst':
+                self.stars = BPASSBurstA24(self.filter_labels, self.redshift, age=self.ages,
+                                            cosmology=self.cosmology,
+                                            lognH=nebula_lognH,
+                                            ULX=True,
+                                            wave_grid=self.wave_grid_rest,
+                                            dust_grains=self.nebula_dust,
+                                            nebula_old=False,
+                                            line_labels=self.line_labels)
+            else:
+                self.stars = BPASSModelA24(self.filter_labels, self.redshift, age=self.ages,
+                                           step=step, cosmology=self.cosmology,
+                                           lognH=nebula_lognH,
+                                           ULX=True,
                                            wave_grid=self.wave_grid_rest,
                                            dust_grains=self.nebula_dust,
                                            nebula_old=False,

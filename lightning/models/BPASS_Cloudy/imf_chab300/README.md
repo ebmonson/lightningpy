@@ -4,7 +4,7 @@
 Files you should put in this folder
 ```
 BPASS_imf_chab300_fullgrid_g.h5
-BPASS_imf_chab300_fullgrid_g.h5
+BPASS_imf_chab300_fullgrid_ng.h5
 ```
 
 ## Cloudy Configuration
