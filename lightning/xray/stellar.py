@@ -209,6 +209,8 @@ class StellarPlaw(XrayPlawExpcut):
         if (len(params.shape) == 1):
             params = params.reshape(-1,1)
 
+        assert self.specresp is not None, 'ARF must be defined to calculate count rates'
+
         params_shape = params.shape
         Nmodels = params_shape[0]
         Nparams_in = params_shape[1]
@@ -399,6 +401,8 @@ class StellarPlaw(XrayPlawExpcut):
 
         if (len(params.shape) == 1):
             params = params.reshape(-1,1)
+
+        assert self.exposure is not None, 'Exposure time must be defined to calculate counts'
 
         params_shape = params.shape
         Nmodels = params_shape[0]

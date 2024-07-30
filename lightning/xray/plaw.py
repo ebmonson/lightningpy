@@ -72,6 +72,8 @@ class XrayPlaw(XrayEmissionModel):
 
     def get_model_countrate_hires(self, params, exptau=None):
 
+        assert self.specresp is not None, 'ARF must be defined to calculate count rates'
+
         param_shape = params.shape # expecting ndarray(Nmodels, Nparams)
         if (len(param_shape) == 1):
             params = params.reshape(1, params.size)
@@ -162,6 +164,8 @@ class XrayPlaw(XrayEmissionModel):
         return countrate
 
     def get_model_counts(self, params, exptau=None):
+
+        assert self.exposure is not None, 'Exposure time must be defined to calculate counts'
 
         param_shape = params.shape # expecting ndarray(Nmodels, Nparams)
         if (len(param_shape) == 1):
@@ -255,6 +259,8 @@ class XrayPlawExpcut(XrayEmissionModel):
 
     def get_model_countrate_hires(self, params, exptau=None):
 
+        assert self.specresp is not None, 'ARF must be defined to calculate count rates'
+
         param_shape = params.shape # expecting ndarray(Nmodels, Nparams)
         if (len(param_shape) == 1):
             params = params.reshape(1, params.size)
@@ -335,6 +341,8 @@ class XrayPlawExpcut(XrayEmissionModel):
         return countrate
 
     def get_model_counts(self, params, exptau=None):
+
+        assert self.exposure is not None, 'Exposure time must be defined to calculate counts'
 
         param_shape = params.shape # expecting ndarray(Nmodels, Nparams)
         if (len(param_shape) == 1):

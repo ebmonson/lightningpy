@@ -168,6 +168,8 @@ class AGNPlaw(XrayPlawExpcut):
             params = params.reshape(1, params.size)
             param_shape = params.shape
 
+        assert self.specresp is not None, 'ARF must be defined to calculate count rates'
+
         Nmodels = param_shape[0]
         Nparams_in = param_shape[1]
 
@@ -350,6 +352,8 @@ class AGNPlaw(XrayPlawExpcut):
         if (len(param_shape) == 1):
             params = params.reshape(1, params.size)
             param_shape = params.shape
+
+        assert self.exposure is not None, 'Exposure time must be defined to calculate counts'
 
         Nmodels = param_shape[0]
         Nparams_in = param_shape[1]
@@ -595,6 +599,8 @@ class Qsosed(XrayEmissionModel):
             params = params.reshape(1, params.size)
             param_shape = params.shape
 
+        assert self.specresp is not None, 'ARF must be defined to calculate count rates'
+
         Nmodels = param_shape[0]
         Nparams_in = param_shape[1]
 
@@ -756,6 +762,8 @@ class Qsosed(XrayEmissionModel):
         if (len(param_shape) == 1):
             params = params.reshape(1, params.size)
             param_shape = params.shape
+
+        assert self.exposure is not None, 'Exposure time must be defined to calculate counts'
 
         Nmodels = param_shape[0]
         Nparams_in = param_shape[1]

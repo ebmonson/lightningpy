@@ -77,22 +77,28 @@ class XrayEmissionModel(BaseEmissionModel):
         # Observed-frame photon energy for calculating count-rate
         self.phot_energ = (self.energ_grid_obs * u.keV).to(u.Lsun * u.s).value
 
-        # Ingest the ARF and put it on the energy grid we use here.
-        specresp = arf['SPECRESP']
-        elo = arf['ENERG_LO']
-        ehi = arf['ENERG_HI']
+        # Ingest the ARF and put it on the energy grid we use here. If there is no ARF,
+        # assume that we're in flux mode.
+        if arf is not None:
+            specresp = arf['SPECRESP']
+            elo = arf['ENERG_LO']
+            ehi = arf['ENERG_HI']
 
-        finterp_arf = interp1d(elo, specresp, bounds_error=False, fill_value=0.0)
-        specresp_interp = finterp_arf(self.energ_grid_obs)
-        self.specresp = specresp_interp
-
-        # Allow for non-uniform specification of exposure time by
-        # letting exposure be either a scalar or an array
-        if (isinstance(exposure, numbers.Number)):
-            exposure = np.full(len(filter_labels), exposure, dtype='float')
+            finterp_arf = interp1d(elo, specresp, bounds_error=False, fill_value=0.0)
+            specresp_interp = finterp_arf(self.energ_grid_obs)
+            self.specresp = specresp_interp
         else:
-            assert(len(exposure) == len(filter_labels)), "Exposure time should be either a scalar or an array with one element per bandpass."
-            exposure = np.array(exposure, dtype='float')
+            self.specresp = None
+
+        if exposure is not None:
+
+            # Allow for non-uniform specification of exposure time by
+            # letting exposure be either a scalar or an array
+            if (isinstance(exposure, numbers.Number)):
+                exposure = np.full(len(filter_labels), exposure, dtype='float')
+            else:
+                assert(len(exposure) == len(filter_labels)), "Exposure time should be either a scalar or an array with one element per bandpass."
+                exposure = np.array(exposure, dtype='float')
 
         self.exposure = exposure
 

@@ -111,13 +111,13 @@ def sed_plot_bestfit(lgh, samples, logprob_samples,
                         **data_kwargs)
         else:
 
-            ax.errorbar(xray_wave_obs[~uplim_mask][xray_mask],
-                        xray_nu_obs[~uplim_mask][xray_mask] * lgh.Lnu_obs[~uplim_mask][xray_mask],
-                        yerr=xray_nu_obs[~uplim_mask][xray_mask] * lgh.Lnu_unc[~uplim_mask][xray_mask],
+            ax.errorbar(xray_wave_obs[~uplim_mask & xray_mask],
+                        xray_nu_obs[~uplim_mask & xray_mask] * lgh.Lnu_obs[~uplim_mask & xray_mask],
+                        yerr=xray_nu_obs[~uplim_mask & xray_mask] * lgh.Lnu_unc[~uplim_mask & xray_mask],
                         **data_kwargs)
 
-            ax.scatter(xray_wave_obs[uplim_mask][xray_mask],
-                       uplim_sigma * xray_nu_obs[uplim_mask][xray_mask] * lgh.Lnu_unc[uplim_mask][xray_mask],
+            ax.scatter(xray_wave_obs[uplim_mask & xray_mask],
+                       uplim_sigma * xray_nu_obs[uplim_mask & xray_mask] * lgh.Lnu_unc[uplim_mask & xray_mask],
                        **uplim_kwargs)
 
 
@@ -381,13 +381,13 @@ def sed_plot_morebayesian(lgh, samples,
 
         else:
 
-            ax.errorbar(xray_wave_obs[~uplim_mask][xray_mask],
-                        xray_nu_obs[~uplim_mask][xray_mask] * lgh.Lnu_obs[~uplim_mask][xray_mask],
-                        yerr=xray_nu_obs[~uplim_mask][xray_mask] * lgh.Lnu_unc[~uplim_mask][xray_mask],
+            ax.errorbar(xray_wave_obs[~uplim_mask & xray_mask],
+                        xray_nu_obs[~uplim_mask & xray_mask] * lgh.Lnu_obs[~uplim_mask & xray_mask],
+                        yerr=xray_nu_obs[~uplim_mask & xray_mask] * lgh.Lnu_unc[~uplim_mask & xray_mask],
                         **data_kwargs)
 
-            ax.scatter(xray_wave_obs[uplim_mask][xray_mask],
-                       uplim_sigma * xray_nu_obs[uplim_mask][xray_mask] * lgh.Lnu_unc[uplim_mask][xray_mask],
+            ax.scatter(xray_wave_obs[uplim_mask & xray_mask],
+                       uplim_sigma * xray_nu_obs[uplim_mask & xray_mask] * lgh.Lnu_unc[uplim_mask & xray_mask],
                        **uplim_kwargs)
 
 
