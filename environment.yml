@@ -1,0 +1,14 @@
+name: plightning
+channels:
+  - conda-forge
+dependencies:
+  - jupyterlab
+  - numpy
+  - scipy
+  - astropy
+  - tqdm
+  - emcee
+  - h5py
+  - matplotlib
+  - corner
+  
