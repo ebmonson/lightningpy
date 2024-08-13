@@ -10,7 +10,7 @@ class ModelBand:
     This is very much taken from UltraNest's ``PredictionBand``
     class with some tweaks. Ultranest is (c) 2019 by Johannes Buchner,
     and is available under GPL v3. Find it here:
-    <https://johannesbuchner.github.io/UltraNest/>_
+    `<https://johannesbuchner.github.io/UltraNest/>`_
 
     All plotting functions (``shade``, ``line``, ``realizations``) draw into the
     current axes unless the ``ax`` keyword is set. The plotting functions also

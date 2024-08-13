@@ -5,9 +5,13 @@ from scipy.integrate import trapz, cumtrapz
 # Functional SFHs
 #################################
 class FunctionalSFH:
-    '''
-        Base class for functional (delayed exponential, double exponential, etc.)
-        star formation histories.
+    '''Base class for functional (delayed exponential, double exponential, etc.) star formation histories.
+
+    Parameters
+    ----------
+    age : array-like
+        Grid of stellar ages on which to evaluate the SFH.
+
     '''
 
     type = 'functional'
@@ -43,13 +47,17 @@ class FunctionalSFH:
         return ob_idcs
 
     def evaluate(self, params):
-        '''
-            This method should return the SFR as a function of time
-            evaluated at the age grid of the SFH model, given the supplied
-            parameters.
+        '''Return the SFR as a function of time.
 
-            It must be overwritten by each specific SFH model, and it should return
-            an (Nmodels, Nages) array.
+        Parameters
+        ----------
+        params : array-like (Nmodels, Nparams)
+            Model parameters.
+
+        Returns
+        -------
+        sfrt : array-like (Nmodels, Nages)
+
         '''
 
         if len(params.shape) == 1:
@@ -72,9 +80,25 @@ class FunctionalSFH:
 
 
     def multiply(self, params, arr):
-        '''
-            Evaluate the SFH for the given parameters and
-            multiply it by the given array.
+        '''Multiply the SFR in each bin by a supplied array (to determine, e.g., the stellar mass in each bin).
+
+        For normal internal use this function determines the appropriate broadcast shape
+        of the output based on the shape of ``arr`` (which could be, e.g. stellar mass as a function of time, or
+        luminosity density as a function of time *and* wavelength). If you find yourself using this function on
+        its own, check the shape of the outputs carefully.
+
+        Parameters
+        ----------
+        params : array-like (Nmodels, Nparams)
+            Model parameters.
+
+        arr : array-like, (..., Nbins, ...) (up to three dimensions)
+            Array to multiply by the SFH.
+
+        Returns
+        -------
+        res : array-like
+            Product of sfh and ``arr`` broadcast to whatever shape was deemed appropriate.
         '''
 
         if len(params.shape) == 1:
@@ -126,10 +150,29 @@ class FunctionalSFH:
         return res
 
 
-    def integrate(self, params, arr, min_age=None, max_age=None, cumulative=False):
-        '''
-            All-purpose integration function for integrating the spectrum,
-            stellar mass, etc. of a stellar population model.
+    def integrate(self, params, arr, cumulative=False):
+        '''Multiply the SFR in each bin by a supplied array and integrate along the age axis.
+
+        For normal internal use this function determines the appropriate broadcast shape
+        of the output based on the shape of ``arr`` (which could be, e.g. stellar mass as a function of time, or
+        luminosity density as a function of time *and* wavelength). If you find yourself using this function on
+        its own, check the shape of the outputs carefully.
+
+        Parameters
+        ----------
+        params : array-like (Nmodels, Nbins)
+            SFR in each bin.
+
+        arr : array-like, (..., Nbins, ...) (up to three dimensions)
+            Array to multiply by the SFH.
+
+        cumulative : bool
+            If ``True``, return the cumulative intgral as a function of age.
+
+        Returns
+        -------
+        res : array-like, (Nmodels, ...)
+            Product of sfh and ``arr``, integrated along the age axis.
         '''
 
         if len(params.shape) == 1:
@@ -173,8 +216,16 @@ class FunctionalSFH:
 # Piecewise SFH
 #################################
 class PiecewiseConstSFH:
-    '''
-        Class for piecewise-constant star formation histories.
+    r'''Class for piecewise-constant star formation histories.
+
+    .. math::
+        \psi(t) = \psi_i,~t_i \leq t < t_{i+1}
+
+    Parameters
+    ----------
+    age : array-like, (Nbins+1)
+        This array should define the edges of the stellar age bins.
+
     '''
 
     type = 'piecewise'
@@ -214,14 +265,20 @@ class PiecewiseConstSFH:
 
 
     def evaluate(self, params):
-        '''
-            This method should return the SFR as a function of time
-            evaluated at the age grid of the SFH model, given the supplied
-            parameters. For the piecewise constant SFH, it's just a pass-through
-            for `params` after checking that it's the right shape.
+        '''Return the SFR as a function of time.
 
-            It will be overwritten by each specific SFH model, but it should return
-            an (Nmodels, Nages) array.
+        For this piecewise constant SFH, it's just a pass-through
+        for `params` after checking that it's the right shape.
+
+        Parameters
+        ----------
+        params : array-like (Nmodels, Nbins)
+            SFR in each bin.
+
+        Returns
+        -------
+        sfrt
+
         '''
 
         # Check that the model is defined for the given parameters
@@ -248,9 +305,25 @@ class PiecewiseConstSFH:
 
 
     def multiply(self, params, arr):
-        '''
-            Evaluate the SFH for the given parameters and
-            multiply it by the given array.
+        '''Multiply the SFR in each bin by a supplied array (to determine, e.g., the stellar mass in each bin).
+
+        For normal internal use this function determines the appropriate broadcast shape
+        of the output based on the shape of ``arr`` (which could be, e.g. stellar mass as a function of time, or
+        luminosity density as a function of time *and* wavelength). If you find yourself using this function on
+        its own, check the shape of the outputs carefully.
+
+        Parameters
+        ----------
+        params : array-like (Nmodels, Nbins)
+            SFR in each bin.
+
+        arr : array-like, (..., Nbins, ...) (up to three dimensions)
+            Array to multiply by the SFH.
+
+        Returns
+        -------
+        res : array-like
+            Product of sfh and ``arr`` broadcast to whatever shape was deemed appropriate.
         '''
 
         if len(params.shape) == 1:
@@ -311,10 +384,29 @@ class PiecewiseConstSFH:
         return res
 
 
-    def sum(self, params, arr, min_age=None, max_age=None, cumulative=False):
-        '''
-            All-purpose function for weighting and summing the spectrum,
-            stellar mass, etc. of a stellar population model.
+    def sum(self, params, arr, cumulative=False):
+        '''Multiply the SFR in each bin by a supplied array and sum along the age axis.
+
+        For normal internal use this function determines the appropriate broadcast shape
+        of the output based on the shape of ``arr`` (which could be, e.g. stellar mass as a function of time, or
+        luminosity density as a function of time *and* wavelength). If you find yourself using this function on
+        its own, check the shape of the outputs carefully.
+
+        Parameters
+        ----------
+        params : array-like (Nmodels, Nbins)
+            SFR in each bin.
+
+        arr : array-like, (..., Nbins, ...) (up to three dimensions)
+            Array to multiply by the SFH.
+
+        cumulative : bool
+            If ``True``, return the cumulative sum as a function of age.
+
+        Returns
+        -------
+        res : array-like, (Nmodels, ...)
+            Product of sfh and ``arr``, summed along the age axis.
         '''
 
         if len(params.shape) == 1:

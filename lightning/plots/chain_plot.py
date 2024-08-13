@@ -5,7 +5,7 @@ def chain_plot(lgh, samples, plot_median=True, median_color='darkorange', **kwar
     '''Produce a chain plot of samples from an SED fit.
 
     The chain plots are placed in a single matplotlib figure,
-    all in a single column. Not that this may be unwieldy in cases with many
+    all in a single column. Not that this may (will) be unwieldy in cases with many
     free parameters.
 
     Parameters
@@ -23,9 +23,10 @@ def chain_plot(lgh, samples, plot_median=True, median_color='darkorange', **kwar
     **kwargs : dict
         Keyword arguments are passed on to `plt.plot` for the chain plot.
 
-    Outputs
+    Returns
     -------
-    matplotlib figure and axes objects containing the chain plot.
+    fig : Matplotlib figure containing the plot
+    axs : List of axes in the plot
 
     '''
 

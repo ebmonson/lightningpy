@@ -56,7 +56,7 @@ class AnalyticPrior():
             Number of samples to draw
         rng : numpy.random.Generator
             Numpy object for random number generation;
-            see `numpy.random.default_rng()`
+            see ``numpy.random.default_rng()``
         seed : int
             Seed for random number generation. If you pass
             a pre-constructed generator this is ignored.
@@ -110,7 +110,7 @@ class TabulatedPrior():
 
         return self.inverse(q)
 
-    def sample(self, size, rng=None):
+    def sample(self, size, rng=None, seed=None):
         '''Sample from the prior.
 
         Parameters
@@ -119,7 +119,7 @@ class TabulatedPrior():
             Number of samples to draw
         rng : numpy.random.Generator
             Numpy object for random number generation;
-            see `numpy.random.default_rng()`
+            see ``numpy.random.default_rng()``
         seed : int
             Seed for random number generation. If you pass
             a pre-constructed generator this is ignored.
@@ -130,7 +130,7 @@ class TabulatedPrior():
             Random samples
         '''
 
-        if rng is None: rng = np.random.default_rng()
+        if rng is None: rng = np.random.default_rng(seed)
 
         q = rng.uniform(size=size)
 

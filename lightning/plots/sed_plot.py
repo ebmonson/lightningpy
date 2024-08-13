@@ -20,11 +20,50 @@ def sed_plot_bestfit(lgh, samples, logprob_samples,
                      uplim_sigma=3,
                      uplim_kwargs={'marker':r'$\downarrow$', 'color':'k'}
                      ):
-    '''
-    Best-fit SED plot. More ~Bayesian~ SED plots TBD. Will probably
-    add a similar function for producing SED plots with uncertainty
-    bands. See also the ppc_sed function for producing more diagnostic
-    SED plots based on posterior predictive checks.
+    '''Best-fit SED plot.
+
+    Selects the highest log-probability model from the chain. Individual
+    components may be plotted.
+
+    Parameters
+    ----------
+    lgh : lightning.Lightning object
+        Used to assign names (and maybe units) to the sample
+        dimensions.
+    samples : np.ndarray, (Nsamples, Nparam), float
+        The sampled parameters. Note that this should also include
+        any constant parameters.
+    logprob_samples : np.ndarray, (Nsamples,), float
+        Log-probability chain.
+    plot_components : bool
+        If ``True``, plot the components of the SED.
+    plot_unatt : bool
+        If ``True``, also plot the unattenuated stellar SED.
+    ax : matplotlib.axes.Axes
+        Axes to draw the plot in. (Default: None)
+    xlim : tuple
+    ylim : tuple
+    xlabel : str
+    ylabel : str
+    stellar_unatt_kwargs : dict
+    stellar_att_kwargs : dict
+    agn_kwargs : dict
+    dust_kwargs : dict
+    total_kwargs : dict
+    data_kwargs : dict
+    show_legend : bool
+    legend_kwargs : dict
+    uplim_sigma : int
+        How many sigma should upper limits be drawn at? (Default: 3)
+    uplim_kwargs : dict
+        Each of the above ``*_kwargs`` parameters is a dict containing keyword arguments describing the color, style,
+        label, etc. of the corresponding plot element, passed through to the appropriate ``matplotlib`` function.
+
+    Returns
+    -------
+    fig : Matplotlib figure containing the plot
+    ax : Axes containing the plot
+
     '''
 
     bestfit = np.argmax(logprob_samples)
@@ -155,8 +194,46 @@ def sed_plot_delchi(lgh, samples, logprob_samples, ax=None,
                     uplim_sigma=3,
                     uplim_kwargs={'marker':r'$\downarrow$', 'color':'k'}
                     ):
-    '''
-    Delchi residuals for the best-fit SED.
+    r'''Delta-chi residuals for the best-fit SED.
+
+    .. math::
+        \delta \chi = (L^{\rm obs}_\nu - L^{\rm mod}_\nu) / \sigma
+
+
+    Selects the highest log-probability model from the chain.
+
+    Parameters
+    ----------
+    lgh : lightning.Lightning object
+        Used to assign names (and maybe units) to the sample
+        dimensions.
+    samples : np.ndarray, (Nsamples, Nparam), float
+        The sampled parameters. Note that this should also include
+        any constant parameters.
+    logprob_samples : np.ndarray, (Nsamples,), float
+        Log-probability chain.
+    xlim : tuple
+    ylim : tuple
+    lines : list or tuple
+        Values to draw horizontal guide lines at (in sigma). (Default: [-1,0,1])
+    linecolors : list or str
+        Corresponding colors for the guide lines. (Default: 'slategray')
+    linestyles : list or str
+        Corresponding styles for the guide lines. (Default: ['-', '--', '--'])
+    xlabel : str
+    ylabel : str
+    data_kwargs : dict
+    uplim_sigma : int
+        How many sigma should upper limits be drawn at? (Default: 3)
+    uplim_kwargs : dict
+        Each of the above ``*_kwargs`` parameters is a dict containing keyword arguments describing the color, style,
+        label, etc. of the corresponding plot element, passed through to the appropriate ``matplotlib`` function.
+
+    Returns
+    -------
+    fig : Matplotlib figure containing the plot
+    ax : Axes containing the plot
+
     '''
 
     bestfit = np.argmax(logprob_samples)
@@ -260,9 +337,49 @@ def sed_plot_morebayesian(lgh, samples,
                           uplim_sigma=3,
                           uplim_kwargs={'marker':r'$\downarrow$', 'color':'k'}
                           ):
-    '''
-    Rather than showing the best-fit SED, show the 16th-84th percentile range of the model Lnu. Currently this doesn't
+    '''More bayesian visualization of the fit, agnostic of the best fit. Better name TBD
+
+    Shows the 16th-84th percentile range of the model Lnu. Currently this doesn't
     show the median or best-fit, just shaded polygons indicating the range.
+
+    Parameters
+    ----------
+    lgh : lightning.Lightning object
+        Used to assign names (and maybe units) to the sample
+        dimensions.
+    samples : np.ndarray, (Nsamples, Nparam), float
+        The sampled parameters. Note that this should also include
+        any constant parameters.
+    logprob_samples : np.ndarray, (Nsamples,), float
+        Log-probability chain.
+    plot_components : bool
+        If ``True``, plot the components of the SED.
+    plot_unatt : bool
+        If ``True``, also plot the unattenuated stellar SED.
+    ax : matplotlib.axes.Axes
+        Axes to draw the plot in. (Default: None)
+    xlim : tuple
+    ylim : tuple
+    xlabel : str
+    ylabel : str
+    stellar_unatt_kwargs : dict
+    stellar_att_kwargs : dict
+    agn_kwargs : dict
+    dust_kwargs : dict
+    total_kwargs : dict
+    data_kwargs : dict
+    show_legend : bool
+    legend_kwargs : dict
+    uplim_sigma : int
+        How many sigma should upper limits be drawn at? (Default: 3)
+    uplim_kwargs : dict
+        Each of the above ``*_kwargs`` parameters is a dict containing keyword arguments describing the color, style,
+        label, etc. of the corresponding plot element, passed through to the appropriate ``matplotlib`` function.
+
+    Returns
+    -------
+    fig : Matplotlib figure containing the plot
+    ax : Axes containing the plot
     '''
 
     bestfit = np.argmax(logprob_samples)
@@ -429,11 +546,51 @@ def sed_plot_delchi_morebayesian(lgh, samples, logprob_samples, ax=None,
                                  uplim_sigma=3,
                                  uplim_kwargs={'marker':r'$\downarrow$', 'color':'k'}
                                  ):
-    '''
-    Delchi residuals. This presentation ignores the best-fit, and instead shows the range of the delta-chi residuals for
-    each band. Ideally we could do this with something like a violin plot, but in practice there's often enough observations
-    and enough dynamic range in wavelength that the violins overlap and squish together. Instead, we plot lines showing
-    the 16th-84th and 5th-95th percentile ranges in delta-chi for each band.
+    '''More Bayesian delta-chi residuals
+
+    This visualization ignores the best-fit, and instead shows the range of the delta-chi residuals for
+    each band.
+
+    I'm not thrilled with the presentation yet. Ideally we would do this with something like a violin plot,
+    but in practice there's often enough observations and enough dynamic range in wavelength that the violins overlap
+    and squish together. Instead, we plot lines showing the 16th-84th and 5th-95th percentile ranges in delta-chi
+    for each band, sort of approximating a violin shape by changing the width of the caps on the lines.
+
+    A better choice might be to sort the observations by wavelength and plot the range of resiudals as a shaded band.
+
+    Parameters
+    ----------
+    lgh : lightning.Lightning object
+        Used to assign names (and maybe units) to the sample
+        dimensions.
+    samples : np.ndarray, (Nsamples, Nparam), float
+        The sampled parameters. Note that this should also include
+        any constant parameters.
+    logprob_samples : np.ndarray, (Nsamples,), float
+        Log-probability chain.
+    xlim : tuple
+    ylim : tuple
+    lines : list or tuple
+        Values to draw horizontal guide lines at (in sigma). (Default: [-1,0,1])
+    linecolors : list or str
+        Corresponding colors for the guide lines. (Default: 'slategray')
+    linestyles : list or str
+        Corresponding styles for the guide lines. (Default: ['-', '--', '--'])
+    xlabel : str
+    ylabel : str
+    data_kwargs_inner : dict
+    data_kwargs_outer : dict
+    uplim_sigma : int
+        How many sigma should upper limits be drawn at? (Default: 3)
+    uplim_kwargs : dict
+        Each of the above ``*_kwargs`` parameters is a dict containing keyword arguments describing the color, style,
+        label, etc. of the corresponding plot element, passed through to the appropriate ``matplotlib`` function.
+
+    Returns
+    -------
+    fig : Matplotlib figure containing the plot
+    ax : Axes containing the plot
+
     '''
 
     lnu_att, lnu_unatt = lgh.get_model_lnu(samples)

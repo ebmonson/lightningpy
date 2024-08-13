@@ -1,22 +1,73 @@
-.. plightning documentation master file, created by
+.. lightning.py documentation master file, created by
    sphinx-quickstart on Thu Mar 30 15:45:30 2023.
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to plightning's documentation!
+Lightning
 ======================================
 
-``plightning`` is the python prototype of the Lightning SED-fitting code.
+``lightning.py`` is the python version of the Lightning SED-fitting code.
 The goal of the project is to maintain Lightning's primary design philosophy
 of simplicty and physically-based models, while taking advantage of Python's
 object-oriented nature and the wide array of pre-existing astronomical Python
 code to improve modularity and user-friendliness.
 
+The IDL version of ``Lightning`` is now considered the "legacy" version, and will not
+see further development. Its documentation will remain available at `lightning-sed.readthedocs.io <https://lightning-sed.readthedocs.io>`_,
+and the source code can still be downloaded from `github.com/rafaeleufrasio/lightning <https://www.github.com/rafaeleufrasio/lightning>`_.
+
+This new python version contains all the features of IDL ``Lightning`` with the current notable exception of the
+Doore+(2021) inclination-dependent attenuation model. Users interested in the properties of highly-inclined
+disk galaxies are encouraged to continue to use IDL ``Lightning`` for their analyses, and to let the authors know
+if it would be nice to access that model through ``lightning.py``.
+
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: Documentation
 
+   installation
+   getting_started
+   model_choice
+   solver_choice
+   examples
+   nebular_emission_recipe
+   filter_profiles
    API_reference
+
+Attribution
+===========
+A paper describing ``lightning.py`` is forthcoming by Monson et al.; this page will be updated on submission. In the
+meantime, work using the new PEGASE+Cloudy and BPASS+Cloudy models are encouraged to also cite Lehmer et al. (2024), while
+work using models described in Doore et al. (2023) should also cite that paper::
+
+    @ARTICLE{2023ApJS..266...39D,
+        author = {{Doore}, Keith and {Monson}, Erik B. and {Eufrasio}, Rafael T. and {Lehmer}, Bret D. and {Garofali}, Kristen and {Basu-Zych}, Antara},
+        title = "{Lightning: An X-Ray to Submillimeter Galaxy SED-fitting Code with Physically Motivated Stellar, Dust, and AGN Models}",
+        journal = {\apjs},
+        keywords = {Extragalactic astronomy, Galaxy properties, Star formation, Spectral energy distribution, 506, 615, 1569, 2129, Astrophysics - Astrophysics of Galaxies},
+        year = 2023,
+        month = jun,
+        volume = {266},
+        number = {2},
+        eid = {39},
+        pages = {39},
+        doi = {10.3847/1538-4365/accc29},
+        archivePrefix = {arXiv},
+        eprint = {2304.06753},
+        primaryClass = {astro-ph.GA},
+        adsurl = {https://ui.adsabs.harvard.edu/abs/2023ApJS..266...39D},
+        adsnote = {Provided by the SAO/NASA Astrophysics Data System}
+    }
+
+License
+=======
+``lightning.py`` is available under the terms of the MIT license.
+
+Acknowledgments
+===============
+``lightning.py`` was primarily developed by Erik B. Monson, with significant contributions from Amirnezam Amiri, Keith
+Doore, and Rafael Eufrasio. Much of ``lightning.py`` is outright ported from or at least heavily based on code from
+IDL ``Lightning``, which was developed by Rafael Eurfrasio, Keith Doore, and Erik B. Monson.
 
 Indices and tables
 ==================

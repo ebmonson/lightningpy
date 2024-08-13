@@ -6,7 +6,9 @@ def corner_plot(lgh, samples, **kwargs):
 
     This is just a thin wrapper around corner that
     just figures out which dimensions are constant
-    and assigns parameter labels to the chains.
+    and assigns parameter labels to the chains. See the
+    link below for a complete listing of keywords understood
+    by corner.
 
     Parameters
     ----------
@@ -19,9 +21,13 @@ def corner_plot(lgh, samples, **kwargs):
     **kwargs : dict
         Keyword arguments are passed on to `corner.corner`.
 
-    Outputs
+    Returns
     -------
-    matplotlib figure object containing the corner plot.
+    fig : Matplotlib figure containing the plot
+
+    References
+    ----------
+    - `<https://corner.readthedocs.io/en/latest/api/>`_
 
     '''
 

@@ -43,8 +43,46 @@ class AGNPlaw(XrayPlawExpcut):
     Angstroms to the X-ray luminosity at 2 keV.
     The high energy cutoff is fixed, but the photon index can
     vary.
+
     The model includes a parameter representing the deviation
-    from the LR17 relationship.
+    from the LR17 relationship. Similar parameters are sometimes called
+    'x-ray weakness' - an underluminous X-ray spectrum compared to the
+    prediction may be a result of mass loading in the corona providing an
+    alternate source of cooling.
+
+    Parameters
+    ----------
+    filter_labels : list, str
+        List of filter labels.
+    arf : dict or astropy.table.Table or numpy structured array
+        A structure defining the anciliary response function (ARF) of your X-ray observations. The structure must have
+        three keys, `'ENERG_LO'`, `'ENERG_HI'`, and `'SPECRESP'`, which given the energy bins and binned spectral response
+        respectively. Only used if `xray_mode='counts'``.
+    exposure : float or np.ndarray (Nfilters)
+        A scalar or array giving the exposure time of the X-ray observations. If an array, it should have the same
+        length as ``filter_labels``, with all non-X-ray bands having their exposure time set to 0. Note that you almost
+        certainly don't need to give exposure time as an array, since the energy dependence of the effective area
+        is explicitly given by the ARF. Only used if ``xray_mode='counts'``.
+    redshift : float
+        Redshift of the model. If set, ``lum_dist`` is ignored.
+    lum_dist : float
+        Luminosity distance to the model. If not set, this will
+        be calculated from the redshift and cosmology. (Default: None)
+    cosmology : astropy.cosmology.FlatLambdaCDM
+        The cosmology to assume. Lightning defaults to a flat cosmology with ``h=0.7 and Om0=0.3``.
+    path_to_models : str
+        Path to lightning models. Not actually used in normal circumstances.
+    path_to_filters : str
+        Path to lightning filters. Not actually used in normal circumstances.
+    wave_grid : tuple (3,), or np.ndarray, (Nwave,), float32, optional
+        Either a tuple of (lo, hi, Nwave) specifying a log-spaced rest-frame wavelength grid, or an array
+        giving the wavelengths directly. At high redshift this should be constructed carefully to ensure that
+        your bands are covered. (Default: (1e-6, 1e-1, 200))
+
+    References
+    ----------
+    - `Lusso and Risaliti (2018) <https://ui.adsabs.harvard.edu/abs/2017A%26A...602A..79L/abstract>`_
+
     '''
     Nparams = 2
     model_name = 'AGN-Plaw'
@@ -390,6 +428,39 @@ class Qsosed(XrayEmissionModel):
 
     The model is available in XSpec, and the implementation
     here was generated using Sherpa.
+
+    Parameters
+    ----------
+    filter_labels : list, str
+        List of filter labels.
+    arf : dict or astropy.table.Table or numpy structured array
+        A structure defining the anciliary response function (ARF) of your X-ray observations. The structure must have
+        three keys, `'ENERG_LO'`, `'ENERG_HI'`, and `'SPECRESP'`, which given the energy bins and binned spectral response
+        respectively. Only used if `xray_mode='counts'``.
+    exposure : float or np.ndarray (Nfilters)
+        A scalar or array giving the exposure time of the X-ray observations. If an array, it should have the same
+        length as ``filter_labels``, with all non-X-ray bands having their exposure time set to 0. Note that you almost
+        certainly don't need to give exposure time as an array, since the energy dependence of the effective area
+        is explicitly given by the ARF. Only used if ``xray_mode='counts'``.
+    redshift : float
+        Redshift of the model. If set, ``lum_dist`` is ignored.
+    lum_dist : float
+        Luminosity distance to the model. If not set, this will
+        be calculated from the redshift and cosmology. (Default: None)
+    cosmology : astropy.cosmology.FlatLambdaCDM
+        The cosmology to assume. Lightning defaults to a flat cosmology with ``h=0.7 and Om0=0.3``.
+    path_to_models : str
+        Path to lightning models. Not actually used in normal circumstances.
+    path_to_filters : str
+        Path to lightning filters. Not actually used in normal circumstances.
+    wave_grid : tuple (3,), or np.ndarray, (Nwave,), float32, optional
+        Either a tuple of (lo, hi, Nwave) specifying a log-spaced rest-frame wavelength grid, or an array
+        giving the wavelengths directly. At high redshift this should be constructed carefully to ensure that
+        your bands are covered. (Default: (1e-6, 1e-1, 200))
+
+    References
+    ----------
+    - `Kubota and Done (2018) <https://ui.adsabs.harvard.edu/abs/2018MNRAS.480.1247K/abstract>`_
 
     '''
     Nparams = 2

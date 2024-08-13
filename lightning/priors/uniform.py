@@ -2,9 +2,23 @@ import numpy as np
 from .base import AnalyticPrior
 
 class UniformPrior(AnalyticPrior):
-    '''Uniform prior.
+    r'''Uniform prior. Parameters are lower bound a and upper bound b, in that order.
 
-    ``p = 1 / (b - a) if x is in [a, b), 0 otherwise``
+    PDF:
+
+    .. math::
+
+        p(x) = \begin{cases}
+                    \frac {1} {b - a} &, ~x \in [a, b) \\
+                    0 &,~{\rm otherwise}
+                \end{cases}
+
+    Quantile function:
+
+    .. math::
+
+        x(q) = q (b - a) + a
+        
 
     '''
 

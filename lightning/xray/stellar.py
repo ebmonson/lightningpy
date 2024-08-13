@@ -72,6 +72,43 @@ class StellarPlaw(XrayPlawExpcut):
     such that the model normalization is a function of the SFH.
     The high energy cutoff is fixed, but the photon index can
     vary.
+
+    The luminosity is determined from the SFH model based on the
+    empirical Lx/M - stellar age relationship from Gilbertson+(2022).
+
+    Parameters
+    ----------
+    filter_labels : list, str
+        List of filter labels.
+    arf : dict or astropy.table.Table or numpy structured array
+        A structure defining the anciliary response function (ARF) of your X-ray observations. The structure must have
+        three keys, `'ENERG_LO'`, `'ENERG_HI'`, and `'SPECRESP'`, which given the energy bins and binned spectral response
+        respectively. Only used if `xray_mode='counts'``.
+    exposure : float or np.ndarray (Nfilters)
+        A scalar or array giving the exposure time of the X-ray observations. If an array, it should have the same
+        length as ``filter_labels``, with all non-X-ray bands having their exposure time set to 0. Note that you almost
+        certainly don't need to give exposure time as an array, since the energy dependence of the effective area
+        is explicitly given by the ARF. Only used if ``xray_mode='counts'``.
+    redshift : float
+        Redshift of the model. If set, ``lum_dist`` is ignored.
+    lum_dist : float
+        Luminosity distance to the model. If not set, this will
+        be calculated from the redshift and cosmology. (Default: None)
+    cosmology : astropy.cosmology.FlatLambdaCDM
+        The cosmology to assume. Lightning defaults to a flat cosmology with ``h=0.7 and Om0=0.3``.
+    path_to_models : str
+        Path to lightning models. Not actually used in normal circumstances.
+    path_to_filters : str
+        Path to lightning filters. Not actually used in normal circumstances.
+    wave_grid : tuple (3,), or np.ndarray, (Nwave,), float32, optional
+        Either a tuple of (lo, hi, Nwave) specifying a log-spaced rest-frame wavelength grid, or an array
+        giving the wavelengths directly. At high redshift this should be constructed carefully to ensure that
+        your bands are covered. (Default: (1e-6, 1e-1, 200))
+
+    References
+    ----------
+    - `Gilbertson et al. (2022) <https://ui.adsabs.harvard.edu/abs/2022ApJ...926...28G/abstract>`_
+
     '''
     Nparams = 1
     model_name = 'Stellar-Plaw'
@@ -94,8 +131,10 @@ class StellarPlaw(XrayPlawExpcut):
             An array of model parameters. For purposes of vectorization
             this can be a 2D array, where the first dimension cycles over
             different sets of parameters.
-        stellar_model : lightning.stellar.StellarModel
+        stellar_model : lightning.stellar model
             The stellar model.
+        stellar_params : np.ndarray(Nmodels, Nparams_st) or np.ndarray(Nparams_st)
+            The stellar model parameters (i.e. metallicity and possible logU).
         sfh : lightning.sfh.PiecewiseConstSFH or lightning.sfh.FunctionalSFH
             The star formation history model.
         sfh_params : np.ndarray(Nmodels, Nparams_sfh) or np.ndarray(Nparams_sfh)
@@ -185,8 +224,10 @@ class StellarPlaw(XrayPlawExpcut):
             An array of model parameters. For purposes of vectorization
             this can be a 2D array, where the first dimension cycles over
             different sets of parameters.
-        stellar_model : lightning.stellar.StellarModel
+        stellar_model : lightning.stellar model
             The stellar model.
+        stellar_params : np.ndarray(Nmodels, Nparams_st) or np.ndarray(Nparams_st)
+            The stellar model parameters (i.e. metallicity and possible logU).
         sfh : lightning.sfh.PiecewiseConstSFH or lightning.sfh.FunctionalSFH
             The star formation history model.
         sfh_params : np.ndarray(Nmodels, Nparams_sfh) or np.ndarray(Nparams_sfh)
@@ -254,8 +295,10 @@ class StellarPlaw(XrayPlawExpcut):
             An array of model parameters. For purposes of vectorization
             this can be a 2D array, where the first dimension cycles over
             different sets of parameters.
-        stellar_model : lightning.stellar.StellarModel
+        stellar_model : lightning.stellar model
             The stellar model.
+        stellar_params : np.ndarray(Nmodels, Nparams_st) or np.ndarray(Nparams_st)
+            The stellar model parameters (i.e. metallicity and possible logU).
         sfh : lightning.sfh.PiecewiseConstSFH or lightning.sfh.FunctionalSFH
             The star formation history model.
         sfh_params : np.ndarray(Nmodels, Nparams_sfh) or np.ndarray(Nparams_sfh)
@@ -316,8 +359,10 @@ class StellarPlaw(XrayPlawExpcut):
             An array of model parameters. For purposes of vectorization
             this can be a 2D array, where the first dimension cycles over
             different sets of parameters.
-        stellar_model : lightning.stellar.StellarModel
+        stellar_model : lightning.stellar model
             The stellar model.
+        stellar_params : np.ndarray(Nmodels, Nparams_st) or np.ndarray(Nparams_st)
+            The stellar model parameters (i.e. metallicity and possible logU).
         sfh : lightning.sfh.PiecewiseConstSFH or lightning.sfh.FunctionalSFH
             The star formation history model.
         sfh_params : np.ndarray(Nmodels, Nparams_sfh) or np.ndarray(Nparams_sfh)
@@ -378,8 +423,10 @@ class StellarPlaw(XrayPlawExpcut):
             An array of model parameters. For purposes of vectorization
             this can be a 2D array, where the first dimension cycles over
             different sets of parameters.
-        stellar_model : lightning.stellar.StellarModel
+        stellar_model : lightning.stellar model
             The stellar model.
+        stellar_params : np.ndarray(Nmodels, Nparams_st) or np.ndarray(Nparams_st)
+            The stellar model parameters (i.e. metallicity and possible logU).
         sfh : lightning.sfh.PiecewiseConstSFH or lightning.sfh.FunctionalSFH
             The star formation history model.
         sfh_params : np.ndarray(Nmodels, Nparams_sfh) or np.ndarray(Nparams_sfh)

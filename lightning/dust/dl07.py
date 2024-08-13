@@ -13,12 +13,14 @@ __all__ = ['DL07Dust']
 #################################
 
 class DL07Dust(BaseEmissionModel):
-    '''An implementation of the Draine & Li (2007) dust emission models.
+    r'''An implementation of the Draine & Li (2007) dust emission models.
 
     A fraction ``gamma`` of the dust is exposed to a radiation field such
-    that the mass of dust ``dM`` exposed to a range of intensities ``[U, U + dU]`` is::
+    that the mass of dust ``dM`` exposed to a range of intensities ``[U, U + dU]`` is
 
-        dM = const * U ^ (-alpha) dU,
+    .. math::
+
+        dM = {\rm const}~U^{-\alpha} dU,
 
     where ``U`` is in ``[Umin, Umax]``. The remaining portion
     ``(1 - gamma)`` is exposed to a radiation field with intensity ``Umin``.
@@ -29,19 +31,21 @@ class DL07Dust(BaseEmissionModel):
         List of filter labels.
     redshift : float
         Redshift of the model.
+    wave_grid : np.ndarray
+        Rest frame wavelength grid to interpolate the model on.
 
     Attributes
     ----------
-    Lnu_rest : numpy.ndarray, (29, 7, 132), float
+    Lnu_rest : numpy.ndarray, (29, 7, Nwave), float
         High-res spectral model grid. First dimension covers U, the second q_PAH,
         and the third covers wavelength.
-    Lnu_obs : numpy.ndarray, (29, 7, 132), float
+    Lnu_obs : numpy.ndarray, (29, 7, Nwave), float
         ``(1 + redshift) * Lnu_rest``
     mean_Lnu : numpy.ndarray, (29, 7, Nfilters), float
         The ``Lnu_obs`` grid integrated against the filters.
     Lbol : numpy.ndarray, (29, 7), float
         Total luminosity of each model in the grid.
-    wave_grid_rest : numpy.ndarray, (132,), float
+    wave_grid_rest : numpy.ndarray, (Nwave,), float
         Rest-frame wavelength grid for the models.
     wave_grid_obs
     nu_grid_rest

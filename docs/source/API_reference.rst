@@ -1,9 +1,6 @@
 API Reference
 =============
 
-- API documentation is currently generated with the ``numpydoc`` scheme, but this is subject to change if I find something I like more.
-- ``__init__`` functions for classes are documented under the class itself.
-
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
@@ -13,6 +10,9 @@ API Reference
    api/sfh
    api/stellar
    api/dust
+   api/agn
+   api/xray
    api/priors
    api/plots
    api/postprocessing
+   api/ppc

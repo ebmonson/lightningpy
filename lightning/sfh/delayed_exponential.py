@@ -6,8 +6,11 @@ import numpy as np
 from .base import FunctionalSFH
 
 class DelayedExponentialSFH(FunctionalSFH):
-    '''
-        sfr(t) = A (t / tau) exp(-t / tau)
+    r'''Delayed exponential burst of star formation
+
+    .. math::
+        \psi(t) = A (t / \tau) \exp(-t / \tau)
+
     '''
 
     type = 'functional'

@@ -25,7 +25,7 @@ def ppc(lgh, samples, logprob_samples, Nrep=1000, seed=None, counts_dist='gaussi
     seed : float
         Seed for random number generation.
 
-    Outputs
+    Returns
     -------
     p-value : float
         A single p-value for the given chain. Extremely low p-values
@@ -38,8 +38,6 @@ def ppc(lgh, samples, logprob_samples, Nrep=1000, seed=None, counts_dist='gaussi
     Notes
     -----
     The implementation of PPC here is ported from IDL Lightning.
-
-    Does not include X-ray model.
 
     '''
 
@@ -146,14 +144,10 @@ def ppc_sed(lgh, samples, logprob_samples, Nrep=1000, seed=None, ax=None, normal
         If True, the data and quantiles of the reproduced data are divided
         by the median of the reproduced data before plotting.
 
-    Outputs
+    Returns
     -------
     PPC SED plot figure: an SED plot showing the quantile bands of the reproduced
     data, with the observed data overplotted.
-
-    Notes
-    -----
-    Does not include X-ray model.
 
     '''
 

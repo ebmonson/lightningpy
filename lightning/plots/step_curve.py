@@ -1,8 +1,7 @@
 import numpy as np
 
 def step_curve(bin_edges, y_values, anchor=False):
-    '''From a histogram (bin edges and count values) generate a step curve for
-    use with matplotlib's ``plot`` function.
+    '''From a histogram (bin edges and count values) generate a step curve for use with matplotlib's ``plot`` function.
 
     This function takes an array of N + 1 bin edges and
     an array of N values and turns them into a list of 2N
@@ -25,10 +24,12 @@ def step_curve(bin_edges, y_values, anchor=False):
         If True, the returned curve will be anchored to
         0 on both sides.
 
-    Outputs
+    Returns
     -------
-    Two numpy arrays containing the x- and y-values of the
-    step curve, respectively.
+    x : np.ndarray
+    y : np.ndarray
+        Two numpy arrays containing the x- and y-values of the
+        step curve, respectively. See note on size below.
 
     Notes
     -----

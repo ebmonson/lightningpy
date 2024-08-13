@@ -17,12 +17,12 @@
 
 # -- Project information -----------------------------------------------------
 
-project = 'plightning'
+project = 'lightning.py'
 copyright = '2023-2024, Erik B. Monson'
 author = 'Erik B. Monson'
 
 # The full version, including alpha/beta/rc tags
-release = 'alpha'
+release = 'v2024.1'
 
 
 # -- General configuration ---------------------------------------------------
@@ -34,6 +34,7 @@ extensions = ['sphinx.ext.autodoc',
               #'sphinx.ext.graphviz',
               #'sphinx.ext.inheritance_diagram',
               'numpydoc',
+              'nbsphinx'
               #'sphinx.ext.napoleon',
 ]
 
@@ -54,8 +55,8 @@ exclude_patterns = []
 # a list of builtin themes.
 #
 # html_theme = 'sphinx_rtd_theme'
-html_theme = 'alabaster'
-html_theme_options = {'home_page_in_toc': True}
+html_theme = 'sphinx_book_theme'
+html_theme_options = {'home_page_in_toc': False}
 
 # Automatically extract typehints when specified and place them in
 # descriptions of the relevant function/method.
@@ -68,3 +69,8 @@ autodoc_class_signature = "separated"
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
+
+# -- Options for LaTeX output -------------------------------------------------
+
+# An inelegant solution for getting tqdm's progress bars (in the notebooks) to compile into Latex
+latex_elements = {'preamble': r'\DeclareUnicodeCharacter{2588}{\#}'}

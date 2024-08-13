@@ -3,6 +3,19 @@ import numpy as np
 from ..attenuation import TabulatedAtten
 
 class SMC(TabulatedAtten):
+    '''Small Magellanic Cloud extinction curve from Gordon et al. (2003)
+
+    Parameters
+    ----------
+    wave : np.ndarray, (Nwave,), float
+        Rest frame wavelength grid to evaluate the model on.
+
+    References
+    ----------
+    - `Gordon et al. (2003) <https://ui.adsabs.harvard.edu/abs/2003ApJ...594..279G/abstract>`_
+    - `<https://www.stsci.edu/hst/instrumentation/reference-data-for-calibration-and-tools/astronomical-catalogs/interstellar-extinction-curves>`_
+
+    '''
 
     type = 'tabulated'
     model_name = 'smc'
@@ -14,6 +27,18 @@ class SMC(TabulatedAtten):
     path = 'dust/att/smc.txt'
 
     def evaluate(self, params):
+        '''Evaluate the attenuation as a function of wavelength for the given parameters.
+
+        Parameters
+        ----------
+        params : np.ndarray, (Nmodels, 1) or (1,)
+            Values for tauV.
+
+        Returns
+        -------
+        expminustau : (Nmodels, Nwave)
+
+        '''
 
         params = np.array(params)
 

@@ -9,16 +9,27 @@ from ..base import BaseEmissionModel
 __all__ = ['Graybody']
 
 class Graybody(BaseEmissionModel):
-    '''A gray-body dust emission model.
+    r'''A gray-body dust emission model.
 
     The gray body is a modified blackbody accounting for variations
-    in opacity and emissivity, such that (Casey et al. 2012)::
+    in opacity and emissivity, such that (Casey et al. 2012):
 
-    Lnu propto [1 - exp(-tau(nu))] Bnu(T) = [1 - exp(-tau(nu))] * nu^3 / [exp(h nu / k T) - 1]
+    .. math::
 
-    where the optical depth is taken to be a power law in frequency: tau(nu) = (nu / nu0)^beta
-    for some nu0 where the optical depth is 1. In practice this is usually assumed to be around 100-200 um.
+        L_\nu \propto [1 - \exp(-\tau(\nu))] B_\nu(T) = [1 - \exp(-\tau(\nu))] \frac{\nu^3}{\exp(h \nu / k T) - 1}
+
+    where the optical depth is taken to be a power law in frequency: ``tau(nu) = (nu / nu0)^beta``
+    for some ``nu0`` where the optical depth is 1. In practice this is usually assumed to be around 100-200 um.
     Beta is expected to range between ~1--2.5.
+
+    Parameters
+    ----------
+    filter_labels : list, str
+        List of filter labels.
+    redshift : float
+        Redshift of the model.
+    wave_grid : np.ndarray
+        Rest frame wavelength grid to evaluate the model on.
 
     '''
 
@@ -58,8 +69,22 @@ class Graybody(BaseEmissionModel):
             self.nu_grid_obs = self.nu_grid_rest * (1 + self.redshift)
 
     def get_model_lnu_hires(self, params):
-        '''
+        '''Construct the high-resolution dust SED.
+
         Note that the model Lnu is normalized to the total luminosity.
+
+        Parameters
+        ----------
+        params : np.ndarray, (Nmodels, 3) or (3,) float32
+            The dust model parameters.
+
+        Returns
+        -------
+        Lnu_obs : np.ndarray, (Nmodels, Nwave), (Nmodels, Nages, Nwave), or (Nwave,), float32
+            The dust spectrum as seen through the given filters
+        Lbol : np.ndarray, (Nmodels,) or (Nmodels, Nages)
+            The total luminosity of the dust model.
+
         '''
 
         param_shape = params.shape # expecting ndarray(Nmodels, Nparams)
@@ -101,6 +126,23 @@ class Graybody(BaseEmissionModel):
         return Lnu_norm
 
     def get_model_lnu(self, params):
+        '''Construct the dust SED as observed in the given filters.
+
+        Note that the model Lnu is normalized to the total luminosity.
+
+        Parameters
+        ----------
+        params : np.ndarray, (Nmodels, 3) or (3,) float32
+            The dust model parameters.
+
+        Returns
+        -------
+        Lnu_obs : np.ndarray, (Nmodels, Nfilters), (Nmodels, Nages, Nfilters), or (Nfilters,), float32
+            The dust spectrum as seen through the given filters
+        Lbol : np.ndarray, (Nmodels,) or (Nmodels, Nages)
+            The total luminosity of the dust model.
+
+        '''
 
         param_shape = params.shape # expecting ndarray(Nmodels, Nparams)
         if (len(param_shape) == 1):

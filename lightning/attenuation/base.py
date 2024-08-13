@@ -6,9 +6,7 @@ from scipy.interpolate import interp1d
 # Dust Attenuation
 #################################
 class AnalyticAtten:
-    '''
-    Base class for analytic (i.e., not tabulated)
-    attenuation curves.
+    '''Base class for analytic (i.e., not tabulated) attenuation curves.
     '''
 
     type = 'analytic'
@@ -44,9 +42,7 @@ class AnalyticAtten:
 
 
     def evaluate(self, params):
-        '''
-        This method should return e^(-tau) at each
-        wavelength.
+        '''This method should return e^(-tau) at each wavelength.
 
         It must be overwritten by each specific attenuation model,
         and it should returnan (Nmodels, Nwave) array.
@@ -104,8 +100,7 @@ class AnalyticAtten:
         print('Total parameters: %d' % (self.Nparams))
 
 class TabulatedAtten:
-    '''
-Base class for tabulated attenuation curves.
+    '''Base class for tabulated attenuation curves.
     '''
 
     type = 'tabulated'
@@ -164,9 +159,7 @@ Base class for tabulated attenuation curves.
         return ob_idcs
 
     def evaluate(self, params):
-        '''
-        This method should return e^(-tau) at each
-        wavelength.
+        '''This method should return e^(-tau) at each wavelength.
 
         It must be overwritten by each specific attenuation model,
         and it should returnan (Nmodels, Nwave) array.

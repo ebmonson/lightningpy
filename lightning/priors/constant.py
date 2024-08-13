@@ -2,7 +2,22 @@ import numpy as np
 from .base import AnalyticPrior
 
 class ConstantPrior(AnalyticPrior):
-    '''
+    r'''Delta function prior. The single parameter is value a.
+
+    PDF:
+
+    .. math::
+        p(x) = \begin{cases}
+                1 &, x = a \\
+                0 &, {\rm otherwise}
+                \end{cases}
+
+    Quantile function:
+
+    .. math::
+        x(q) = a \forall q
+
+
     Holding a parameter constant is not really a prior so much as a reduction
     in the dimensionality of the problem, so this is basically a dummy
     prior, which tells the sampler to hold a parameter constant and what its

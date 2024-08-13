@@ -48,9 +48,6 @@ class PEGASEModel(BaseEmissionModel):
     step : bool
         If ``True``, ``age`` is interpreted as age bounds for a piecewise-constant
         SFH model. Otherwise ``age`` is interpreted as the age grid for a continuous SFH.
-    Z_met : {0.001, 0.004, 0.008, 0.020, 0.050, 0.100}
-        The metallicity of the stellar model. For the Pégase models, only the above metallicities
-        are available.
     add_lines : bool
         If ``True``, emission lines are added to the spectral models at ages ``< 1e7`` yr.
     wave_grid : np.ndarray, (Nwave,), float, optional
@@ -357,6 +354,18 @@ class PEGASEModel(BaseEmissionModel):
             self.Lnu_obs = lnu_age
 
     def get_mstar_coeff(self, Z):
+        '''Return the Mstar coefficients as a function of age for a given metallicity.
+
+        Parameters
+        ----------
+        Z : array-like (Nmodels,)
+            Stellar metallicity
+
+        Returns
+        -------
+        Mstar : (Nmodels, Nages)
+            Surviving stellar mass as function of age per 1 Msun yr-1 of SFR.
+        '''
 
         finterp_mstar = interp1d(self.Zmet, self.mstar, axis=1)
         return finterp_mstar(Z).T
@@ -600,6 +609,29 @@ class PEGASEModel(BaseEmissionModel):
             return lmod_attenuated, lmod_unattenuated, L_TIR
 
     def get_model_lines(self, sfh, sfh_param, params, stepwise=False):
+        '''Get the integrated luminosity of all the lines available to the nebular model.
+
+        See self.line_names for a full list of lines. In the future we'll need to redden these lines
+        to compare them to the observed lines, such that our line attenuation is consistent with
+        the attenuation of the stellar population model broadly.
+
+        Parameters
+        ----------
+        sfh : instance of lightning.sfh.PiecewiseConstSFH or lightning.sfh.FunctionalSFH
+            Star formation history model.
+        sfh_params : np.ndarray, (Nmodels, Nparam) or (Nparam,), float32
+            Parameters for the star formation history.
+        params : np.ndarray, (Nmodels, 1) or (Nmodels,)
+            Values for Z.
+        stepwise : bool
+            If true, the lines are returned as a function of stellar age.
+
+        Returns
+        -------
+        Lmod_lines :  np.ndarray, (Nmodels, Nlines) or (Nmodels, Nages, Nlines)
+            Integrated line luminosities, optionally as a function of age.
+
+        '''
 
         if (len(sfh_param.shape) == 1):
             sfh_param = sfh_param.reshape(1, -1)
@@ -931,6 +963,18 @@ class PEGASEModelA24(BaseEmissionModel):
             self.Lnu_obs = lnu_age
 
     def get_mstar_coeff(self, Z):
+        '''Return the Mstar coefficients as a function of age for a given metallicity.
+
+        Parameters
+        ----------
+        Z : array-like (Nmodels,)
+            Stellar metallicity
+
+        Returns
+        -------
+        Mstar : (Nmodels, Nages)
+            Surviving stellar mass as function of age per 1 Msun yr-1 of SFR.
+        '''
 
         finterp_mstar = interp1d(self.Zmet, self.mstar, axis=1)
         return finterp_mstar(Z).T
@@ -1183,10 +1227,10 @@ class PEGASEModelA24(BaseEmissionModel):
             Star formation history model.
         sfh_params : np.ndarray, (Nmodels, Nparam) or (Nparam,), float32
             Parameters for the star formation history.
-        params : np.ndarray, (Nmodels, 1) or (Nmodels,)
-            Values for logU, if the model includes a nebular component.
+        params : np.ndarray, (Nmodels, 2)
+            Values for Z and logU.
         stepwise : bool
-            If true, the spectrum is returned as a function of stellar age.
+            If true, the lines are returned as a function of stellar age.
 
         Returns
         -------

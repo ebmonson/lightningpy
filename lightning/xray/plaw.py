@@ -17,6 +17,8 @@ def plaw_expcut(E, norm, gamma, E_cut):
     return norm[:,None] * np.exp(-1 * E[None,:] / E_cut[:,None]) * E[None,:] ** (1 - gamma[:,None])
 
 class XrayPlaw(XrayEmissionModel):
+    '''Power law emission model.
+    '''
 
     Nparams = 2
     model_name = 'Xray-Plaw'
@@ -201,6 +203,8 @@ class XrayPlaw(XrayEmissionModel):
         return counts
 
 class XrayPlawExpcut(XrayEmissionModel):
+    '''Power law emission model with an exponential cutoff at high energy.
+    '''
 
     Nparams = 3
     model_name = 'Xray-Plaw-Expcut'

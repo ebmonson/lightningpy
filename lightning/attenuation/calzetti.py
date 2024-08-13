@@ -7,9 +7,15 @@ import numpy as np
 from .base import AnalyticAtten
 
 class CalzettiAtten(AnalyticAtten):
-    '''
-    Featureless Calzetti+(2000) attenuation curve.
+    '''Featureless Calzetti+(2000) attenuation curve.
+
     Linearly extrapolated from 1200 Å down to 912 Å.
+
+    Parameters
+    ----------
+    wave : np.ndarray, (Nwave,), float
+        Rest frame wavelength grid to evaluate the model on.
+
     '''
 
     type = 'analytic'
@@ -26,15 +32,23 @@ class CalzettiAtten(AnalyticAtten):
         self.Nwave = len(self.wave)
 
     def get_AV(self, params):
-        '''
-        Helper function to convert tauV -> AV
+        '''Helper function to convert tauV -> AV
         '''
 
         return 2.5 * params[:,0] / np.log(10)
 
     def evaluate(self, params):
-        '''
-        Model includes a featureless Calzetti law.
+        '''Evaluate the attenuation as a function of wavelength for the given parameters.
+
+        Parameters
+        ----------
+        params : np.ndarray, (Nmodels, 1) or (1,)
+            Values for tauV.
+
+        Returns
+        -------
+        expminustau : (Nmodels, Nwave)
+
         '''
 
         klam = np.zeros_like(self.wave) # k_lambda, the opacity as a function of wavelength
@@ -86,10 +100,15 @@ class CalzettiAtten(AnalyticAtten):
 
 
 class ModifiedCalzettiAtten(AnalyticAtten):
-    '''
-    The Noll+(2009) modification of the Calzetti+(2000) attenuation curve,
-    including a Drude-profile bump at 2175 Å and a variable UV slope.
+    '''The Noll+(2009) modification of the Calzetti+(2000) attenuation curve, including a Drude-profile bump at 2175 Å and a variable UV slope.
+
     Linearly extrapolated from 1200 Å down to 912 Å.
+
+    Parameters
+    ----------
+    wave : np.ndarray, (Nwave,), float
+        Rest frame wavelength grid to evaluate the model on.
+
     '''
 
     type = 'analytic'
@@ -110,14 +129,14 @@ class ModifiedCalzettiAtten(AnalyticAtten):
         self.Nwave = len(self.wave)
 
     def get_AV(self, params):
-        '''
-        Helper function to convert tauV -> AV
+        '''Helper function to convert tauV -> AV
         '''
 
         return 2.5 * params[:,0] / np.log(10)
 
     def evaluate(self, params):
-        '''
+        '''Evaluate the attenuation as a function of wavelength for the given parameters.
+
         Model includes a featureless Calzetti law, with the
         addition of a UV bump at 2175 A and optionally extra birth cloud
         extinction. The same attenuation model used in most cases by
@@ -129,6 +148,16 @@ class ModifiedCalzettiAtten(AnalyticAtten):
 
         If I were willing to be a little more clever, I would define this more obviously
         as an extension of the CalzettiAtten class.
+
+        Parameters
+        ----------
+        params : np.ndarray, (Nmodels, 3) or (3,)
+            Parameters of the model.
+
+        Returns
+        -------
+        expminustau : (Nmodels, Nwave)
+
         '''
 
         klam = np.zeros_like(self.wave)

@@ -321,13 +321,13 @@ def postprocess_catalog(res_filenames,
     names : array-like, str
         Names for each of the galaxies. If None (default), we'll just guess
         based on the filenames of the chains assuming that they're named something like
-        [NAME]_chain.npy.
+        [NAME]_chain.h5.
     catalog_name : str
-        Default: "postprocessed_catalog.hdf5"
+        (Default: "postprocessed_catalog.hdf5")
 
     Returns
     -------
-    Nothing.
+    None
 
     Notes
     -----

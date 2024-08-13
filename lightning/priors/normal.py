@@ -3,8 +3,22 @@ from scipy.special import erfinv
 from .base import AnalyticPrior
 
 class NormalPrior(AnalyticPrior):
-    '''
-    Normal prior.
+    r'''
+    Normal prior. Parameters are mu and sigma, in that order.
+
+    PDF:
+
+    .. math::
+
+        p(x) = \frac{1}{\sigma \sqrt{2 \pi}} \exp[- \frac{(x - \mu)^2}{\sigma^2}]
+
+    Quantile function:
+
+    .. math ::
+
+        x(q) = \mu + \sigma \sqrt{2} {\rm erfinv}(2q - 1)
+
+
     '''
 
     type = 'analytic'
@@ -18,9 +32,7 @@ class NormalPrior(AnalyticPrior):
     def evaluate(self, x):
         '''
         Return an array with the same shape as ``x`` that is
-        equal to::
-
-        p = 1 / [sigma * sqrt(2 * pi)] * exp[-1 * (x - mu)**2 / sigma**2)]
+        equal to p = 1 / [sigma * sqrt(2 * pi)] * exp[-1 * (x - mu)**2 / sigma**2)]
 
         '''
 
@@ -34,9 +46,7 @@ class NormalPrior(AnalyticPrior):
     def quantile(self, q):
         '''
         Return an array with the same shape as ``q`` that is
-        equal to::
-
-        x = mu + sigma * sqrt(2) * erfinv(2 * q - 1)
+        equal to x = mu + sigma * sqrt(2) * erfinv(2 * q - 1)
 
         '''
 

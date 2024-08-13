@@ -6,13 +6,20 @@ import numpy as np
 from .base import FunctionalSFH
 
 class SingleExponentialSFH(FunctionalSFH):
-    '''
-    Exponentially decaying burst of star formation:
+    r'''Exponentially decaying burst of star formation
 
-    sfr(t) = {A exp[(t - tburst) / tau] / k, t <= tburst
-             {0, t > tburst
+    .. math::
+        \psi(t) =
+            \begin{cases}
+                A \exp[(t - t_{burst}) / \tau] / k,~&t \leq t_{burst} \\\\
+                0,~&t > t_{burst}
+            \end{cases}
 
-    where k = tau * [1 - exp(-tburst / tau)]
+    where
+
+    .. math::
+        k = \tau * [1 - \exp(-t_{burst} / \tau)]
+
     '''
 
     type = 'functional'

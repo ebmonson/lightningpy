@@ -5,4 +5,4 @@ from .absorption import Tbabs, Phabs
 
 __all__ = ['XrayPlaw', 'XrayPlawExpcut',
            'StellarPlaw', 'AGNPlaw',
-           'Tbabs', 'Phabs']
+           'Qsosed', 'Tbabs', 'Phabs']

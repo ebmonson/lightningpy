@@ -15,11 +15,42 @@ def sfh_plot(lgh, samples,
              line_kwargs={'color':'k', 'zorder':1},
              ylim=None
              ):
-    '''
-    A plot of the posterior SFR as a function of time.
+    '''A plot of the posterior SFR as a function of time.
 
     The default behavior is to plot the median of the posterior
     along with the shaded 16th to 84th percentiles.
+
+    Parameters
+    ----------
+    lgh : lightning.Lightning object
+        Used to assign names (and maybe units) to the sample
+        dimensions.
+    samples : np.ndarray, (Nsamples, Nparam), float
+        The sampled parameters. Note that this should also include
+        any constant parameters.
+    xlabel : str
+    ylabel : str
+    ax : matplotlib.axes.Axes
+        Axes to draw the plot in. (Default: None)
+    shade_band : bool
+        Should the uncertainty band be shaded?
+    shade_q : tuple
+        Quantiles to shade between. (Default: (0.16, 0.84))
+    shade_kwargs : dict
+    plot_line : bool
+        Should a line be plotted?
+    line_q :
+        Quantile to plot the line at (Default: 0.5)
+    line_kwargs : dict
+        Each of the above ``*_kwargs`` parameters is a dict containing keyword arguments describing the color, style,
+        label, etc. of the corresponding plot element, passed through to the appropriate ``matplotlib`` function.
+    ylim : tuple
+
+    Returns
+    -------
+    fig : Matplotlib figure containing the plot
+    ax : Axes containing the plot
+    
     '''
 
     sfh_type = lgh.sfh.type

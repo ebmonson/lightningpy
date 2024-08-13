@@ -22,6 +22,11 @@ __all__ = ['AGNModel']
 class AGNModel(BaseEmissionModel):
     '''An implementation of the Stalevski (2016) SKIRTOR models.
 
+    The broken power law accretion disk model is the SKIRTOR default.
+    Future versions may include an option to swap in the Schartman+(2005)
+    power law model as in X-Cigale.
+    Optionally includes the X-Cigale recipe for polar dust extinction.
+
     Parameters
     ----------
     filter_labels : list, str
@@ -30,6 +35,10 @@ class AGNModel(BaseEmissionModel):
         Redshift of the model.
     wave_grid : np.ndarray, (Nwave,), float, optional
         If set, the spectra are interpreted to this wavelength grid.
+    polar_dust : bool
+        If ``True``, AGN polar dust extinction and re-emission are implemented following the recipe from X-Cigale
+        Note that even if this keyword is set to ``False``, the polar dust optical depth remains a parameter of the
+        model - it just doesn't do anything, and should held at 0 in any fitting. (Default: True)
 
     Attributes
     ----------
@@ -47,6 +56,11 @@ class AGNModel(BaseEmissionModel):
     wave_grid_obs
     nu_grid_rest
     nu_grid_obs
+
+    References
+    ----------
+    - `<https://ui.adsabs.harvard.edu/abs/2016MNRAS.458.2288S/abstract>`_
+    - `<https://sites.google.com/site/skirtorus>`_
 
     '''
 
@@ -202,8 +216,6 @@ class AGNModel(BaseEmissionModel):
             The AGN model parameters.
         exptau : np.ndarray, (Nmodels, Nwave) or (Nwave,) float
             The ISM attenuation curve.
-        exptau_polar : np.ndarray, (Nmodels, Nwave) or (Nwave,) float
-            The polar dust attenuation curve.
 
         Returns
         -------
@@ -291,7 +303,7 @@ class AGNModel(BaseEmissionModel):
 
         return lnu_hires
 
-    def get_model_lnu(self, params, exptau=None, exptau_polar=None):
+    def get_model_lnu(self, params, exptau=None):
         '''Produce the AGN model as observed in the given filters.
 
         Given a set of parameters, produce the observed AGN SED, optionally
@@ -304,8 +316,6 @@ class AGNModel(BaseEmissionModel):
             The AGN model parameters.
         exptau : np.ndarray, (Nmodels, Nwave) or (Nwave,) float
             The ISM attenuation curve.
-        exptau_polar : np.ndarray, (Nmodels, Nwave) or (Nwave,) float
-            The polar dust attenuation curve.
 
         Returns
         -------

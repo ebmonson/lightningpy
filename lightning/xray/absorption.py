@@ -3,6 +3,24 @@ import numpy as np
 from ..attenuation import TabulatedAtten
 
 class Tbabs(TabulatedAtten):
+    '''Tubingen-Boulder absorption model.
+
+    Includes cross sections from gas phase ISM, grains, and molecular hydrogen.
+    Atomic abundances are fixed to the default.
+
+    Parameters
+    ----------
+    wave : np.ndarray, (Nwave,), float
+        Rest frame wavelength grid to evaluate the model on.
+    path_to_models : str
+        Path to lightning models. Not actually used in normal circumstances.
+
+    References
+    ----------
+    - `<https://heasarc.gsfc.nasa.gov/xanadu/xspec/manual/XSmodelTbabs.html>`_
+    - `<https://ui.adsabs.harvard.edu/abs/2000ApJ...542..914W/abstract>`_
+
+    '''
 
     type = 'tabulated'
     model_name = 'tbabs'
@@ -14,12 +32,17 @@ class Tbabs(TabulatedAtten):
     path = 'xray/abs/tbabs.txt'
 
     def evaluate(self, params):
-        '''
-            This method should return e^(-tau) at each
-            wavelength.
+        '''Evaluate the absorption as a function of wavelength for the given parameters.
 
-            It must be overwritten by each specific attenuation model,
-            and it should returnan (Nmodels, Nwave) array.
+        Parameters
+        ----------
+        params : np.ndarray, (Nmodels, 1) or (1,)
+            Values for NH.
+
+        Returns
+        -------
+        expminustau : (Nmodels, Nwave)
+
         '''
 
         params = np.array(params)
@@ -49,6 +72,22 @@ class Tbabs(TabulatedAtten):
         return expminustau
 
 class Phabs(TabulatedAtten):
+    '''Photo-electric absorption model.
+
+    Abundances are fixed to the default.
+
+    Parameters
+    ----------
+    wave : np.ndarray, (Nwave,), float
+        Rest frame wavelength grid to evaluate the model on.
+    path_to_models : str
+        Path to lightning models. Not actually used in normal circumstances.
+
+    References
+    ----------
+    - `<https://heasarc.gsfc.nasa.gov/xanadu/xspec/manual/node264.html>`_
+
+    '''
 
     type = 'tabulated'
     model_name = 'phabs'
@@ -60,12 +99,17 @@ class Phabs(TabulatedAtten):
     path = 'xray/abs/phabs.txt'
 
     def evaluate(self, params):
-        '''
-            This method should return e^(-tau) at each
-            wavelength.
+        '''Evaluate the absorption as a function of wavelength for the given parameters.
 
-            It must be overwritten by each specific attenuation model,
-            and it should returnan (Nmodels, Nwave) array.
+        Parameters
+        ----------
+        params : np.ndarray, (Nmodels, 1) or (1,)
+            Values for NH.
+
+        Returns
+        -------
+        expminustau : (Nmodels, Nwave)
+
         '''
 
         params = np.array(params)

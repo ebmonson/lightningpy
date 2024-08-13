@@ -44,76 +44,114 @@ from .get_filters import get_filters
 __all__ = ['Lightning']
 
 class Lightning:
-    '''An interface for estimating the likelihood of an SED model.
+    '''The main interface for fitting a galaxy SED model.
 
     Holds information about the filters, observed flux, type of model.
-    The goal is to have one object for an entire fitting process and to
-    call some kind of method, like ``Lightning.fit(p0, method='mcmc')`` to produce
-    the best fit or sample the distributions.
+    Model components are set by keyword choices.
+
+    The only strictly required parameters are ``filter_labels`` and one of ``redshift`` or
+    ``lum_dist``. For inference/fitting, both ``flux_obs`` and ``flux_unc`` must also be set.
 
     Parameters
     ----------
     filter_labels : list, str
         List of filter labels.
     redshift : float
-        Redshift of the model. If set, ``lum_dist`` is ignored.
+        Redshift of the model. If set, ``lum_dist`` is ignored. (Default: None)
     lum_dist : float
         Luminosity distance to the model. If ``redshift`` is not set,
         this parameter must be. If a luminosity distance is provided
         instead of a redshift, the redshift is set to 0 (as we assume
-        the galaxy is very nearby).
+        the galaxy is very nearby). (Default: None)
     flux_obs : np.ndarray, (Nfilters,) or (Nfilters, 2), float32, optional
-        The observed flux densities in mJy, or, optionally, the
+        The observed flux densities in *mJy*, or, optionally, the
         observed flux densities and associated uncertainties as a
-        2D array.
+        2D array. (Default: None)
     flux_unc : np.ndarray, (Nfilters,), float32, optional
-        The uncertainties associated with ``flux_obs``.
+        The uncertainties associated with ``flux_obs``, in *mJy*. (Default: None)
     wave_grid : tuple (3,), or np.ndarray, (Nwave,), float32, optional
-        Either a tuple specifying a log-spaced wavelength grid, or an array
-        giving the wavelengths.
+        Either a tuple of (lo, hi, Nwave) specifying a log-spaced rest-frame wavelength grid, or an array
+        giving the wavelengths directly. (Default: (0.1, 1000, 1200))
     stellar_type : {'PEGASE', 'PEGASE-A24', 'BPASS', 'BPASS-A24', 'BPASS-ULX-G24'}
-        String specifying the simple stellar population models to use.
+        String specifying the simple stellar population models to use. 'PEGASE' gives the stellar population models
+        used in IDL Lightning (Doore+2023). (Default: 'PEGASE')
     line_labels : np.ndarray, (Nlines,), string, optional
         Line labels in the format used by pyCloudy. See `lightning/models/linelist_full.txt` for the
-        complete list of lines in the grid and their format.
+        complete list of available lines in the grid and their format. (Default: None)
     line_flux : np.ndarray, (Nlines,) or (Nlines, 2), float32, optional
-        Observed integrated fluxes of the lines in erg cm-2 s-1 (unless the ``line_index`` keyword is set, in which
-        case they should be normalized by the appropriate line). CURRENTLY UNUSED
+        Observed integrated fluxes of the lines in *erg cm-2 s-1* (unless the ``line_index`` keyword is set, in which
+        case they should be normalized by the appropriate line). (Default: None)
     line_flux_unc : np.ndarray,(Nlines,), float32, optional
-        Uncertainties on the integrated line fluxes in erg cm-2 s-1 (unless ``line_index`` is set, see above)
+        Uncertainties on the integrated line fluxes in *erg cm-2 s-1* (unless ``line_index`` is set, see above) (Default: None)
     line_index : string
         Label for the line to index the line fluxes by. You would normally want this to be ``'H__1_486132A'`` or
-        ``'H__1_656280A'`` for Hbeta and Halpha, respectively, but the highest SNR line would be a good choice.
-        If this is set to ``None`` then the model line fluxes are not normalized for fitting.
+        ``'H__1_656280A'`` for Hbeta and Halpha, respectively, but the highest SNR line could be a good choice.
+        If this is set to ``None`` then the model line fluxes are not normalized for fitting. (Default: None)
     nebula_lognH : float
         log of the Hydrogen density in cm-3 for the Cloudy grids. (Default: 2.0)
     nebula_dust : bool
         If ``True``, then dust grains are included in the Cloudy grids. (Default: False)
-    SFH_type : {'Piecewise-Constant', 'Delayed-Exponential'}
-        String specifying the SFH type to use.
+    SFH_type : {'Piecewise-Constant', 'Delayed-Exponential', 'Single-Exponential', 'Burst'}
+        String specifying the SFH type to use. (Default: 'Piecewise-Constant')
     ages : np.ndarray, (Nages,), float32
         Array giving the stellar ages (or stellar age bins) of the stellar
-        population models.
+        population models. Default depends on the model and redshift.
     atten_type : {'Modified-Calzetti', 'Calzetti'}
-        String specifying the dust attenuation model to use.
+        String specifying the dust attenuation model to use. (Default: 'Modified-Calzetti')
     dust_emission : bool
         If ``True``, a Draine & Li (2007) dust emission model is included,
-        in energy balance with the attenuated power.
+        in energy balance with the attenuated power. (Default: False)
     agn_emission : bool
         If ``True``, a Stalevski et al. (2016) UV-IR AGN emission model is
-        included.
+        included. (Default: False)
+    agn_polar_dust : bool
+        If ``True``, AGN polar dust extinction and re-emission are implemented following the recipe from X-Cigale. Note
+        that even if this keyword is set to ``False``, the polar dust optical depth remains a parameter of the
+        model - it just doesn't do anything, and should held at 0 in any fitting. (Default: False)
+    xray_mode : {'flux', 'counts', 'None', None}
+        String specifying the mode for X-ray model fitting - fluxes are fit like any other point in the SED, while
+        counts are folded through the instrumental response. Expect counts mode to be more flexible but harder to set
+        up. If you are fitting X-ray data from multiple instruments simultaneously, you must set this to 'flux' (and should
+        convert your instrumental countrates to fluxes assuming the same spectrum for every instrument). (Default: None)
+    xray_stellar_emission : {'Stellar-Plaw', 'None', None}
+        String specifying the X-ray stellar model. Currently the only available model is 'Stellar-Plaw', which uses
+        the Gilbertson+(2022) LX-stellar age scaling relation to calculate the luminosity.  (Default: None)
+    xray_agn_emission : {'AGN-Plaw', 'QSOSED', 'None', None}
+        String specifying the X-ray AGN model. The 'AGN-Plaw' model is a power law sclaed by the Lusso & Risaliti (2017)
+        empirical L2500-L2keV relationship; the QSOSED model is a theoretical accretion disk + comptonization model
+        that sets the normalization of the whole X-ray-to-IR AGN model as a function of M and mdot. (Default: None)
+    xray_absorption : {'tbabs', 'phabs', 'None', None}
+        String specifying the X-ray absorption model to use. Two instances are used, one in the rest frame describing the
+        intrinsic absorption, and one in the observed frame with a constant Galactic NH. (Default: None)
+    xray_wave_grid : tuple (3,), or np.ndarray, (Nwave,), float32, optional
+        Either a tuple of (lo, hi, Nwave) specifying a log-spaced rest-frame wavelength grid, or an array
+        giving the wavelengths directly. At high redshift this should be constructed carefully to ensure that
+        your bands are covered. (Default: (1e-6, 1e-1, 200))
+    xray_arf : dict or astropy.table.Table or numpy structured array
+        A structure defining the anciliary response function (ARF) of your X-ray observations. The structure must have
+        three keys, `'ENERG_LO'`, `'ENERG_HI'`, and `'SPECRESP'`, which given the energy bins and binned spectral response
+        respectively. Only used if `xray_mode='counts'``. (Default: None)
+    xray_exposure : float or np.ndarray (Nfilters)
+        A scalar or array giving the exposure time of the X-ray observations. If an array, it should have the same
+        length as ``filter_labels``, with all non-X-ray bands having their exposure time set to 0. Note that you almost
+        certainly don't need to give exposure time as an array, since the energy dependence of the effective area
+        is explicitly given by the ARF. Only used if ``xray_mode='counts'``. (Default: None)
+    galactic_NH : float
+        A scalar giving the Galactic column density along the line of sight to the source in *1e20 cm-2*. (Default: 0.0)
     lightning_filter_path : str
         Path to lightning filters. Not actually used.
     print_setup_time : bool
-        If ``True``, the setup time will be printed.
-    model_unc : np.ndarray, (Nfilters,), float32, or float
+        If ``True``, the setup time will be printed. (Default: False)
+    model_unc : np.ndarray, (Nfilters,), float, or float
         Fractional (i.e. [0,1)) model uncertainty to include in the fits. If
         a scalar is provided, the same model uncertainty is applied to each filter.
         Alternately, model uncertainties can be provided as an array, one per filter.
         The smarter way to do this in the future may be to set model uncertainties per
-        component, rather than per filter.
+        component, rather than per filter. (Default: None)
+    model_unc_lines : np.ndarray, (Nlines,), float, or float
+        Fractional (i.e. [0,1)) model uncertainty to include in the line fits. (Default: None)
     cosmology : astropy.cosmology.FlatLambdaCDM
-        The cosmology to assume.
+        The cosmology to assume. Lightning defaults to a flat cosmology with ``h=0.7 and Om0=0.3``.
     uplim_handling : {'exact', 'approx'}
         A string specifying how upper limits are to be handled. In the case of 'exact' we treat
         them as derived in e.g. Appendix A of Sawicki et al. (2012). In the case of 'approx', upper limits
@@ -1325,6 +1363,28 @@ class Lightning:
         return lnu_processed, lnu_intrinsic
 
     def get_model_lines(self, params, stepwise=False):
+        '''Construct the absorbed and intrinsic model lines.
+
+        Only available if the model *has* lines
+
+        Parameters
+        ----------
+        params : np.ndarray(Nmodels, Nparams) or np.ndarray(Nparams)
+            An array of model parameters. For purposes of vectorization
+            this can be a 2D array, where the first dimension cycles over
+            different sets of parameters.
+        stepwise : bool
+            If true, this function returns the spectral model as a function
+            of stellar age.
+
+        Returns
+        -------
+        lines_ext : np.ndarray(Nmodels, Nlines) or np.ndarray(Nmodels, Nlines, Nages)
+            Model line luminosities in Lsun after multiplication by the galaxy attenuation curve.
+        lnu_intrinsic : np.ndarray(Nmodels, Nlines) or np.ndarray(Nmodels, Nlines, Nages)
+            Intrinsic model line luminosities in Lsun.
+
+        '''
 
         param_shape = params.shape # expecting ndarray(Nmodels, Nparams)
 
@@ -1985,7 +2045,7 @@ class Lightning:
         return res
 
     def get_mcmc_chains(self, sampler, thin=None, discard=None, flat=True, Nsamples=1000, const_dim=None, const_vals=None):
-        '''Reduce the emcee sampler object into chains and an astropy Table object with basic information.
+        '''Reduce the emcee sampler object into chains.
 
         Parameters
         ----------
@@ -2141,14 +2201,13 @@ class Lightning:
         return out
 
     def save_json(self, fname):
-        '''
-        Save the information needed to reconstruct this Lightning object to a json
-        file.
+        '''Save the information needed to reconstruct this Lightning object to a json file.
 
         The Lightning object can be remade using ``Lightning.from_json``.
 
         The json configuration file is in theory human readable but note that the wavelength grids
         are reproduced in their entirety, so the file will likely be thousands of lines long.
+
         '''
 
         import json
@@ -2159,11 +2218,15 @@ class Lightning:
                       f,
                       indent=4)
 
+    @staticmethod
     def from_json(fname):
-        '''
-        Construct a Lightning object with the configuration specified by a json file.
+        '''Construct a Lightning object with the configuration specified by a json file.
+
         This was a nice idea when the model was simple enough that it could just be
-        Lightning(**config) but now it's kind of a nightmare. Should move to binary only.
+        ``Lightning(**config)`` but now it's kind of a nightmare. Should move to binary only.
+        Or come up with a better scheme for ascii serialization, so that I don't have to
+        update this function every time I change anything about the model.
+
         '''
 
         import json
@@ -2215,12 +2278,13 @@ class Lightning:
         return lgh
 
     def save_pickle(self, fname):
-        '''
-        Save this whole Lightning object to a pickle.
+        '''Save this whole Lightning object to a pickle.
+
         This will be larger than just saving the configuration to a json file,
         since it contains the whole object, all of the models, etc.
 
         The normal caveats with pickles apply.
+
         '''
 
         import pickle
@@ -2231,30 +2295,55 @@ class Lightning:
 
     ## PLOTS
     def chain_plot(self, samples, **kwargs):
+        '''Make chain plot.
+
+        See lightning.plots.chain_plot
+
+        '''
         # At some point, google whether the renaming here is necessary
         from lightning.plots import chain_plot as f
 
         return f(self, samples, **kwargs)
 
     def corner_plot(self, samples, **kwargs):
+        '''Make corner plot.
+
+        See lightning.plots.corner_plot
+
+        '''
 
         from lightning.plots import corner_plot as f
 
         return f(self, samples, **kwargs)
 
     def sed_plot_bestfit(self, samples, logprob_samples, **kwargs):
+        '''Make plot of the best-fitting SED.
+
+        See lightning.plots.sed_plot_bestfit
+
+        '''
 
         from lightning.plots import sed_plot_bestfit as f
 
         return f(self, samples, logprob_samples, **kwargs)
 
     def sed_plot_delchi(self, samples, logprob_samples, **kwargs):
+        '''Make residual plot.
+
+        See lightning.plots.sed_plot_delchi
+
+        '''
 
         from lightning.plots import sed_plot_delchi as f
 
         return f(self, samples, logprob_samples, **kwargs)
 
     def sfh_plot(self, samples, **kwargs):
+        '''Make SFH plot.
+
+        See lightning.plots.sfh_plot
+
+        '''
 
         from lightning.plots import sfh_plot as f
 
