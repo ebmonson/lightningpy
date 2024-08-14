@@ -11,8 +11,8 @@ requires-python = ">=3.10"
 keywords = ["astronomy", "SED fitting", "Bayesian"]
 license = {file = "LICENSE"}
 maintainers = [
-  {name = "Erik Monson", email = "TODO@TODO.com"},
-  {name = "Rafael Eufrasio", email = "TODO@TODO.com"},
+  {name = "Erik Monson", email = "eqm5663@psu.edu"},
+  {name = "Rafael Eufrasio", email = "eufrasio@uark.edu"},
   {name = "Keith Doore", email = "kjdoore@gmail.com"},
 ]
 classifiers = [
@@ -53,6 +53,9 @@ docs = [  # Required for ReadTheDocs
   "sphinx_rtd_theme",
   "sphinx-autoapi",
   "coverage[toml]",
+  "numpydoc",
+  "nbsphinx",
+  "sphinx-book-theme"
 ]
 
 # [tool.setuptools_scm]
