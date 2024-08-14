@@ -6,22 +6,23 @@
 > they're still ~1.6 GB because I haven't decided how to cut down the wavelength grid yet.
 > Message me and I'll send you a tarball.
 
-python prototype of the Lightning SED fitting code.
+Python prototype of the Lightning SED fitting code.
 
 Keep in mind that everything here is not necessarily *right* or produced according to best practices. Yet.
 
-## Requirements
+## Installation
 ------
-- numpy
-- scipy
-- astropy
-- tqdm
-- emcee (for `Lightning.fit(method='emcee')`)
-- h5py (for `lightning.postprocessing.postprocess_catalog`)
-- matplotlib (for everything in `lightning.plots`)
-- corner (for `lightning.plots.corner_plot`)
+Currently, `plightning` is not available on [PyPI](https://pypi.org/) or [conda-forge](https://conda-forge.org/).
+Until it is uploaded, `plightning` and its dependencies can be installed by cloning the repo, creating a conda environment with the required dependencies, and then installing the package:
 
-You probably already have most of these; if you don't they're all easily retrievable with `conda`.
+```sh
+git clone https://github.com/ebmonson/plightning.git
+cd plightning
+conda env create -f environment.yml
+conda activate lightning
+pip install .  --no-deps
+```
+
 
 ## Current Caveats/Notes/Planned Changes
 ----------

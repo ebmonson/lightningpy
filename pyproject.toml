@@ -1,0 +1,70 @@
+[build-system]
+requires = ["setuptools>=45", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "plightning"
+description = "Lightning SED fitting code."
+dynamic = ["version"]
+readme = "README.md"
+requires-python = ">=3.10"
+keywords = ["astronomy", "SED fitting", "Bayesian"]
+license = {file = "LICENSE"}
+maintainers = [
+  {name = "Erik Monson", email = "eqm5663@psu.edu"},
+  {name = "Rafael Eufrasio", email = "eufrasio@uark.edu"},
+  {name = "Keith Doore", email = "kjdoore@gmail.com"},
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+
+dependencies = [
+    "numpy",
+    "scipy",
+    "astropy",
+    "tqdm",
+    "emcee",
+    "h5py",
+    "matplotlib",
+    "corner",
+]
+
+[project.urls]
+Documentation = "https://github.com/ebmonson/plightning#readme"
+Issues = "https://github.com/ebmonson/plightning/issues"
+Source = "https://github.com/ebmonson/plightning"
+Repository = "https://github.com/ebmonson/plightning.git"
+
+[tool.setuptools]
+packages = ["lightning"]
+
+[project.optional-dependencies]
+dev = [
+  "ruff",
+  "pytest",
+  "pytest-cov",
+]
+# Note that we can shift to GitHub Pages
+docs = [  # Required for ReadTheDocs
+  "myst_parser",
+  "sphinx",
+  "myst-nb",
+  "sphinx_rtd_theme",
+  "sphinx-autoapi",
+  "coverage[toml]",
+  "numpydoc",
+  "nbsphinx",
+  "sphinx-book-theme"
+]
+
+# [tool.setuptools_scm]
+# write_to = "plightning/_version.py"
+
+# TODO: Set up ruff linter and formater settings
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+exclude = [
+  "docs",
+]
