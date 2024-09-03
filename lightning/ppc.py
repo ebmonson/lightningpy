@@ -67,12 +67,13 @@ def ppc(lgh, samples, logprob_samples, Nrep=1000, seed=None, counts_dist='gaussi
 
     # and perturbed by the uncertainties on the data
     total_unc2 = lgh.Lnu_unc[None,:]**2 + (lgh.model_unc * Lmod)**2
+    total_unc2[:, lgh.Lnu_unc == 0] = 0
     Lmod_perturbed = rng.normal(loc=Lmod, scale=np.sqrt(total_unc2))
 
     # Lmod_perturbed are now fake "observed" data, assuming that the model is correct.
     # We calculate chi2 comparing these new "observations" with the original observations
     # and with the unperturbed Lmod.
-    chi2_obs = np.nansum((lgh.Lnu_obs[None,:] - Lmod_perturbed)**2 / total_unc2, axis=-1)
+    chi2_obs = np.nansum((lgh.Lnu_obs[None,:] - Lmod)**2 / total_unc2, axis=-1)
     chi2_rep = np.nansum((Lmod - Lmod_perturbed)**2 / total_unc2, axis=-1)
 
     # Now we calculate the X-ray contribution to both kinds of chi2, if applicable.
@@ -93,7 +94,7 @@ def ppc(lgh, samples, logprob_samples, Nrep=1000, seed=None, counts_dist='gaussi
             else:
                 raise ValueError("'counts_dist' must be either 'poisson' or 'gaussian'.")
 
-            xray_chi2_obs = np.nansum((net_counts[None,xray_mask] - counts_perturbed[:,xray_mask]) ** 2 / counts_total_unc2[:,xray_mask], axis=-1)
+            xray_chi2_obs = np.nansum((net_counts[None,xray_mask] - counts_mod[:,xray_mask]) ** 2 / counts_total_unc2[:,xray_mask], axis=-1)
             xray_chi2_rep = np.nansum((counts_mod[:,xray_mask] - counts_perturbed[:,xray_mask]) ** 2 / counts_total_unc2[:,xray_mask], axis=-1)
 
         else:
@@ -102,7 +103,7 @@ def ppc(lgh, samples, logprob_samples, Nrep=1000, seed=None, counts_dist='gaussi
 
             Lmod_xray_perturbed = rng.normal(loc=Lmod_xray, scale=np.sqrt(xray_total_unc2))
 
-            xray_chi2_obs = np.nansum((lgh.Lnu_obs[None,xray_mask] - Lmod_xray_perturbed[:,xray_mask])**2 / xray_total_unc2[:,xray_mask], axis=-1)
+            xray_chi2_obs = np.nansum((lgh.Lnu_obs[None,xray_mask] - Lmod_xray[:,xray_mask])**2 / xray_total_unc2[:,xray_mask], axis=-1)
             xray_chi2_rep = np.nansum((Lmod_xray[:,xray_mask] - Lmod_xray_perturbed[:,xray_mask])**2 / xray_total_unc2[:,xray_mask], axis=-1)
 
         chi2_obs += xray_chi2_obs
