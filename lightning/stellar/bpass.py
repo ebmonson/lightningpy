@@ -941,7 +941,7 @@ class BPASSModelA24(BaseEmissionModel):
             # lineratios = np.zeros((len(time), len(self.Zmet), len(self.line_names)))
 
             self.nebular = False
-            self.line_labels = None
+            self.line_labels = [None]
             self.wave_lines = None
             self.Nparams = 1
             self.param_names = ['Zmet']
