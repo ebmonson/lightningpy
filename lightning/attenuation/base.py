@@ -1,6 +1,7 @@
 from pathlib import Path
 import numpy as np
 from scipy.interpolate import interp1d
+from importlib.resources import files
 
 #################################
 # Dust Attenuation
@@ -111,16 +112,15 @@ class TabulatedAtten:
     param_bounds = np.array([-np.inf, np.inf]).reshape(1,2)
     path = 'None'
 
-    def __init__(self, wave=None, path_to_models=None):
+    def __init__(self, wave=None):
 
-        if (path_to_models is None):
-            self.path_to_models = str(Path(__file__).parent.resolve()) + '/../models/'
-        else:
-            self.path_to_models = path_to_models
-            if(self.path_to_models[-1] != '/'): self.path_to_models = self.path_to_models + '/'
+
+        self.modeldir = files('lightning.data.models')
 
         if (self.path != 'None'):
-            arr = np.loadtxt(self.path_to_models + self.path, dtype='float')
+            with self.modeldir.joinpath(self.path).open('r') as f:
+                arr = np.loadtxt(f, dtype='float')
+
             wave_src = arr[:,0]
             expminustau_src = arr[:,-1]
 

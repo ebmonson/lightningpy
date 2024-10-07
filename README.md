@@ -2,9 +2,10 @@
 
 > [!Note]
 >
-> The full set of BPASS+Cloudy models is not included in this repo at the moment;
-> they're still ~1.6 GB because I haven't decided how to cut down the wavelength grid yet.
-> Message me and I'll send you a tarball.
+> The only stellar population models included in this distribution are the "legacy"
+> PEGASE models used in IDL Lightning. The recently developed BPASS + Cloudy
+> and PEGASE + Cloudy models used in Lehmer+(2024) must be [downloaded](https://www.dropbox.com/scl/fo/is74ra0tc1t0jdo4dsntm/ADDNjrtxro2euqCWmYrCO0Y?rlkey=9v113nb8rqgl5zul6xawuwdde&st=kzgq6kxr&dl=0) before they
+> can be used with Lightning.
 
 Python prototype of the Lightning SED fitting code.
 

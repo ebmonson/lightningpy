@@ -97,12 +97,17 @@ class PEGASEModel(BaseEmissionModel):
         Nmet = len(Zgrid)
         self.Zmet = Zgrid
 
-        if (nebular_effects):
-            self.path_to_models = [self.path_to_models + 'PEGASE/legacy/Kroupa01/' + 'Kroupa01_Z%5.3f_nebular_spec.idl' % (Z_met) for Z_met in Zgrid]
-        else:
-            self.path_to_models = [self.path_to_models + 'PEGASE/legacy/Kroupa01/' + 'Kroupa01_Z%5.3f_spec.idl' % (Z_met) for Z_met in Zgrid]
+        self.modeldir = self.modeldir.joinpath('PEGASE/legacy/Kroupa01/')
 
-        burst_dict = readsav(self.path_to_models[0]) # Read in the first file to get the ages, wavelength, etc.
+        if (nebular_effects):
+            # self.path_to_models = [self.path_to_models + 'PEGASE/legacy/Kroupa01/' + 'Kroupa01_Z%5.3f_nebular_spec.idl' % (Z_met) for Z_met in Zgrid]
+            fnames = ['Kroupa01_Z%5.3f_nebular_spec.idl' % (Z_met) for Z_met in Zgrid]
+        else:
+            # self.path_to_models = [self.path_to_models + 'PEGASE/legacy/Kroupa01/' + 'Kroupa01_Z%5.3f_spec.idl' % (Z_met) for Z_met in Zgrid]
+            fname = ['Kroupa01_Z%5.3f_spec.idl' % (Z_met) for Z_met in Zgrid]
+
+        # burst_dict = readsav(self.path_to_models[0]) # Read in the first file to get the ages, wavelength, etc.
+        burst_dict = readsav(str(self.modeldir.joinpath(fnames[0])))
 
         if cosmology is None:
             from astropy.cosmology import FlatLambdaCDM
@@ -170,9 +175,10 @@ class PEGASEModel(BaseEmissionModel):
             wave_lines_strong = np.array([wave_lines[idx] for idx in line_idcs.values()])
             line_names_strong = np.array(list(line_idcs.keys()))
 
-        for i in np.arange(1, len(self.path_to_models)):
+        # for i in np.arange(1, len(self.path_to_models)):
+        for i in np.arange(1, len(fnames)):
 
-            burst_dict = readsav(self.path_to_models[i])
+            burst_dict = readsav(str(self.modeldir.joinpath(fnames[i])))
 
             lnu_model[i,:,:] = burst_dict['lnu']
             mstar[i,:] = burst_dict['mstars']
@@ -743,13 +749,21 @@ class PEGASEModelA24(BaseEmissionModel):
             Load the appropriate models from the PEGASE h5 files and either integrate
             them in bins (if ``step==True``) or interpolate them to an age grid otherwise.
         '''
-        self.path_to_linelist = self.path_to_models
-        if dust_grains:
-            self.path_to_models = self.path_to_models + 'PEGASE/Cloudy/imf_kroupa01/' + 'PEGASE_imf_kroupa01_fullgrid_g.h5'
-        else:
-            self.path_to_models = self.path_to_models + 'PEGASE/Cloudy/imf_kroupa01/' + 'PEGASE_imf_kroupa01_fullgrid_ng.h5'
+        # self.path_to_linelist = self.path_to_models
+        self.path_to_linelist = self.modeldir
 
-        f = h5py.File(self.path_to_models)
+        dust_str = 'g' if dust_grains else 'ng'
+
+        # if dust_grains:
+        #     self.path_to_models = self.path_to_models + 'PEGASE/Cloudy/imf_kroupa01/' + 'PEGASE_imf_kroupa01_fullgrid_g.h5'
+        # else:
+        #     self.path_to_models = self.path_to_models + 'PEGASE/Cloudy/imf_kroupa01/' + 'PEGASE_imf_kroupa01_fullgrid_ng.h5'
+
+        self.modeldir = self.modeldir.joinpath('PEGASE/Cloudy/imf_kroupa01/')
+        fname = 'PEGASE_imf_kroupa01_fullgrid_%s.h5' % dust_str
+
+        #f = h5py.File(self.path_to_models)
+        f = h5py.File(self.modeldir.joinpath(fname).open('rb'))
 
         self.Zmet = f['Zstars'][:]
 
@@ -841,6 +855,9 @@ class PEGASEModelA24(BaseEmissionModel):
             self.param_names_fncy = [r'$Z$']
             self.param_bounds = np.array([np.min(self.Zmet), np.max(self.Zmet)]).reshape(1,2)
 
+
+        f.close()
+        
         wave_model_obs = wave_model * (1 + self.redshift)
         nu_model_obs = nu_model / (1 + self.redshift)
 

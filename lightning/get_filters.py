@@ -7,6 +7,7 @@ import numpy as np
 import json
 from scipy.interpolate import interp1d
 from scipy.integrate import trapz
+from importlib.resources import files
 
 __all__ = ['get_filters']
 
@@ -59,7 +60,7 @@ def _parse_tophat_str(s):
 
     return lo, hi
 
-def get_filters(filter_labels, wave_grid, path_to_filters=None):
+def get_filters(filter_labels, wave_grid):
     '''Look up and load filters from files.
 
     Filters are interpolated to a common wavelength grid. Completely
@@ -85,15 +86,10 @@ def get_filters(filter_labels, wave_grid, path_to_filters=None):
         filter.
     '''
 
-    if (path_to_filters is None):
-        path_to_filters = str(Path(__file__).parent.resolve()) + '/filters/'
-    else:
-        if(path_to_filters[-1] != '/'): path_to_filters = path_to_filters + '/'
-
-    #if (path_to_filters[-1] != '/'): path_to_filters = path_to_filters + '/'
+    filtdir = files('lightning.data.filters')
 
     # Load the JSON blob containing the filter names.
-    with open(path_to_filters + 'filters.json') as f:
+    with filtdir.joinpath('filters.json').open(mode='r') as f:
         filter_paths = json.load(f)
 
     # Initialize a dict for the filters. Might change this to a structured numpy array.
@@ -127,13 +123,12 @@ def get_filters(filter_labels, wave_grid, path_to_filters=None):
 
         else:
 
-            path_to_this_filter = path_to_filters + filter_paths[label]
-
-            filt_arr = np.loadtxt(path_to_this_filter, dtype=[('wave', 'float'), ('transm', 'float')])
+            with filtdir.joinpath(filter_paths[label]).open(mode='r') as f:
+                filt_arr = np.loadtxt(f, dtype=[('wave', 'float'), ('transm', 'float')])
 
             # Interpolate the filter onto the internal wavelength grid
-            f = interp1d(filt_arr['wave'], filt_arr['transm'], bounds_error=False, fill_value=0.0)
-            transm_interp = f(wave_grid)
+            func = interp1d(filt_arr['wave'], filt_arr['transm'], bounds_error=False, fill_value=0.0)
+            transm_interp = func(wave_grid)
 
             # And normalize the filter
             # NOTE: right now this sets *completely* non-overlapping filters to NaN

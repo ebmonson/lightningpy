@@ -75,7 +75,7 @@ class DL07Dust(BaseEmissionModel):
             Load the models from various files.
         '''
 
-        self.path_to_models = self.path_to_models + 'dust/DL07/'
+        self.modeldir = self.modeldir.joinpath('dust/DL07')
 
         self._U_grid = ['0.10','0.15','0.20','0.30','0.40','0.50','0.70','0.80',
                       '1.00','1.20','1.50','2.50','3.00','4.00', '5.00','7.00',
@@ -100,9 +100,8 @@ class DL07Dust(BaseEmissionModel):
         for i,U in enumerate(self._U_grid):
             for j,mod in enumerate(self._mod_grid):
 
-                fname = self.path_to_models + 'U%s/U%s_%s_%s.txt' % (U,U,U,mod)
-
-                model_arr = np.loadtxt(fname, usecols=(0,1), skiprows=61)
+                with self.modeldir.joinpath('U%s/U%s_%s_%s.txt' % (U,U,U,mod)).open('r') as f:
+                    model_arr = np.loadtxt(f, usecols=(0,1), skiprows=61)
 
                 # Model files are in order of decreasing wavelenth/increasing nu
                 nu_src = c_um / model_arr[:,0]

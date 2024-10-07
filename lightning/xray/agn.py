@@ -70,10 +70,6 @@ class AGNPlaw(XrayPlawExpcut):
         be calculated from the redshift and cosmology. (Default: None)
     cosmology : astropy.cosmology.FlatLambdaCDM
         The cosmology to assume. Lightning defaults to a flat cosmology with ``h=0.7 and Om0=0.3``.
-    path_to_models : str
-        Path to lightning models. Not actually used in normal circumstances.
-    path_to_filters : str
-        Path to lightning filters. Not actually used in normal circumstances.
     wave_grid : tuple (3,), or np.ndarray, (Nwave,), float32, optional
         Either a tuple of (lo, hi, Nwave) specifying a log-spaced rest-frame wavelength grid, or an array
         giving the wavelengths directly. At high redshift this should be constructed carefully to ensure that
@@ -449,10 +445,6 @@ class Qsosed(XrayEmissionModel):
         be calculated from the redshift and cosmology. (Default: None)
     cosmology : astropy.cosmology.FlatLambdaCDM
         The cosmology to assume. Lightning defaults to a flat cosmology with ``h=0.7 and Om0=0.3``.
-    path_to_models : str
-        Path to lightning models. Not actually used in normal circumstances.
-    path_to_filters : str
-        Path to lightning filters. Not actually used in normal circumstances.
     wave_grid : tuple (3,), or np.ndarray, (Nwave,), float32, optional
         Either a tuple of (lo, hi, Nwave) specifying a log-spaced rest-frame wavelength grid, or an array
         giving the wavelengths directly. At high redshift this should be constructed carefully to ensure that
@@ -478,13 +470,10 @@ class Qsosed(XrayEmissionModel):
 
     def _construct_model(self, wave_grid=None):
 
-        self.path_to_models = self.path_to_models + 'xray/'
+        self.modeldir = self.modeldir.joinpath('xray/')
 
-        # with fits.open(self.path_to_models + 'qsosed.fits.gz') as f:
-        #
-        #     models = fits.read('')
-
-        source_table = Table.read(self.path_to_models + 'qsosed.fits.gz')
+        with self.modeldir.joinpath('qsosed.fits.gz').open('rb') as f:
+            source_table = Table.read(f, format='fits')
 
         Nmass = source_table.meta['N_MASS']
         Nmdot = source_table.meta['N_MDOT']

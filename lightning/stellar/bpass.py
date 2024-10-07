@@ -128,12 +128,21 @@ class BPASSModel(BaseEmissionModel):
         if (nebular_effects) and (not binaries):
             raise ValueError('Binaries are required to use the Cloudy nebular emission grids.')
 
-        if (dust_grains):
-            self.path_to_models = [self.path_to_models + 'BPASS_Cloudy/imf_135_300/' + 'BPASS_imf135_300_z%s_bin_gr.h5' % (s) for s in Zstr]
-        else:
-            self.path_to_models = [self.path_to_models + 'BPASS_Cloudy/imf_135_300/' + 'BPASS_imf135_300_z%s_bin_ng.h5' % (s) for s in Zstr]
+        self.modeldir = self.modeldir.joinpath('BPASS_Cloudy/imf_135_300/')
 
-        f = h5py.File(self.path_to_models[0])
+        # if (dust_grains):
+            # self.path_to_models = [self.path_to_models + 'BPASS_Cloudy/imf_135_300/' + 'BPASS_imf135_300_z%s_bin_gr.h5' % (s) for s in Zstr]
+        # else:
+            # self.path_to_models = [self.path_to_models + 'BPASS_Cloudy/imf_135_300/' + 'BPASS_imf135_300_z%s_bin_ng.h5' % (s) for s in Zstr]
+
+        if (dust_grains):
+            fnames = ['BPASS_imf135_300_z%s_bin_gr.h5' % (s) for s in Zstr]
+        else:
+            fnames = ['BPASS_imf135_300_z%s_bin_ng.h5' % (s) for s in Zstr]
+
+        # f = h5py.File(self.path_to_models[0])
+
+        f = h5py.File(self.modeldir.joinpath(fnames[0]).open('rb'))
 
         if cosmology is None:
             from astropy.cosmology import FlatLambdaCDM
@@ -170,7 +179,7 @@ class BPASSModel(BaseEmissionModel):
         # Our convention here for ease of integration is that the wavelength is the last axis,
         # transposed from the way the models are gridded.
 
-        #f.close()
+        f.close()
 
         # mstar = f['mstar'][:] # Stellar mass
         # q0 = f['q0'][:] # Number of lyman continuum photons
@@ -183,7 +192,8 @@ class BPASSModel(BaseEmissionModel):
             lnu_model = np.zeros((len(time), len(self.Zmet), len(self.logU), len(wave_model)))
             llines = np.zeros((len(time), len(self.Zmet), len(self.logU), len(self.line_names)))
             for j in np.arange(len(self.Zmet)):
-                f = h5py.File(self.path_to_models[j])
+                # f = h5py.File(self.path_to_models[j])
+                f = h5py.File(self.modeldir.joinpath(fnames[j]).open('rb'))
                 mstar[:,j] = f['mstar'][:]
                 q0[:,j] = f['q0'][:]
                 lbol[:,j] = f['Lbol'][:]
@@ -207,7 +217,8 @@ class BPASSModel(BaseEmissionModel):
         else:
             lnu_model = np.zeros((len(time), len(self.Zmet), len(wave_model)))
             for j in np.arange(len(self.Zmet)):
-                f = h5py.File(self.path_to_models[j])
+                # f = h5py.File(self.path_to_models[j])
+                f = h5py.File(self.modeldir.joinpath(fnames[j]).open('rb'))
                 mstar[:,j] = f['mstar'][:]
                 q0[:,j] = f['q0'][:]
                 lbol[:,j] = f['Lbol'][:]
@@ -821,17 +832,30 @@ class BPASSModelA24(BaseEmissionModel):
             Load the appropriate models from the BPASS h5 files and either integrate
             them in bins (if ``step==True``) or interpolate them to an age grid otherwise.
         '''
-        self.path_to_linelist = self.path_to_models
+
+        self.path_to_linelist = self.modeldir
+        # self.path_to_linelist = self.path_to_models
 
         dust_str = 'g' if dust_grains else 'ng'
 
+        # self.modeldir = self.modeldir.joinpath('BPASS_Cloudy/imf_135_300/')
+        # if (dust_grains):
+        #     fnames = ['BPASS_imf135_300_z%s_bin_gr.h5' % (s) for s in Zstr]
+        # else:
+        #     fnames = ['BPASS_imf135_300_z%s_bin_ng.h5' % (s) for s in Zstr]
+        # f = h5py.File(self.modeldir.joinpath(fnames[0]).open('rb'))
 
         if ULX:
-            self.path_to_models = self.path_to_models + 'BPASS_Cloudy/imf_135_100/SXP/BPASS_G24_imf135_100_fullgrid_%s.h5' % dust_str
+            self.modeldir = self.modeldir.joinpath('BPASS_Cloudy/imf_135_100/SXP/')
+            fname = 'BPASS_G24_imf135_100_fullgrid_%s.h5' % dust_str
+            # self.path_to_models = self.path_to_models + 'BPASS_Cloudy/imf_135_100/SXP/BPASS_G24_imf135_100_fullgrid_%s.h5' % dust_str
         else:
-            self.path_to_models = self.path_to_models + 'BPASS_Cloudy/imf_chab300/BPASS_imf_chab300_fullgrid_%s.h5' % dust_str
+            self.modeldir = self.modeldir.joinpath('BPASS_Cloudy/imf_chab300/')
+            fname = 'BPASS_imf_chab300_fullgrid_%s.h5' % dust_str
+            # self.path_to_models = self.path_to_models + 'BPASS_Cloudy/imf_chab300/BPASS_imf_chab300_fullgrid_%s.h5' % dust_str
 
-        f = h5py.File(self.path_to_models)
+        # f = h5py.File(self.path_to_models)
+        f = h5py.File(self.modeldir.joinpath(fname).open('rb'))
 
         self.Zmet = f['Zstars'][:]
 
@@ -877,9 +901,13 @@ class BPASSModelA24(BaseEmissionModel):
         if (nebular_effects):
 
             if (line_labels is None) or (str(line_labels) == 'default'):
-                self.line_labels = np.loadtxt(self.path_to_linelist + 'linelist_default.txt', dtype='<U16')
+                with self.path_to_linelist.joinpath('linelist_default.txt').open('rb') as lf:
+                    self.line_labels = np.loadtxt(lf, dtype='<U16')
+                # self.line_labels = np.loadtxt(self.path_to_linelist + 'linelist_default.txt', dtype='<U16')
             elif str(line_labels) == 'full':
-                self.line_labels = np.loadtxt(self.path_to_linelist + 'linelist_full.txt', dtype='<U16')
+                with self.path_to_linelist.joinpath('linelist_full.txt').open('rb') as lf:
+                    self.line_labels = np.loadtxt(lf, dtype='<U16')
+                # self.line_labels = np.loadtxt(self.path_to_linelist + 'linelist_full.txt', dtype='<U16')
             else:
                 self.line_labels = line_labels
 
@@ -948,6 +976,8 @@ class BPASSModelA24(BaseEmissionModel):
             self.param_descr = ['Metallicity (mass fraction, where solar = 0.020 ~ 10**[-1.7])']
             self.param_names_fncy = [r'$Z$']
             self.param_bounds = np.array([np.min(self.Zmet), np.max(self.Zmet)]).reshape(1,2)
+
+        f.close()
 
         wave_model_obs = wave_model * (1 + self.redshift)
         nu_model_obs = nu_model / (1 + self.redshift)

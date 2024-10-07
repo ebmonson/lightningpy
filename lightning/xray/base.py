@@ -1,6 +1,7 @@
 import warnings
 import numbers
 from pathlib import Path
+from importlib.resources import files
 
 import numpy as np
 from scipy.integrate import trapz
@@ -28,8 +29,7 @@ class XrayEmissionModel(BaseEmissionModel):
     param_bounds = np.array([None, None]).reshape(1,2)
 
     def __init__(self, filter_labels, arf, exposure, redshift,
-                 lum_dist=None, cosmology=None,
-                 path_to_models=None, path_to_filters=None, **kwargs):
+                 lum_dist=None, cosmology=None, **kwargs):
         '''
             Generic initialization. Actual model-building should be handled
             by implementing the `construct_model` and `construct_model_grid` methods.
@@ -53,18 +53,7 @@ class XrayEmissionModel(BaseEmissionModel):
         self.DL = lum_dist
         self._DL_cm = (self.DL * u.Mpc).to(u.cm).value
 
-        if (path_to_models is None):
-            self.path_to_models = str(Path(__file__).parent.resolve()) + '/../models/'
-        else:
-            self.path_to_models = path_to_models
-            if(self.path_to_models[-1] != '/'): self.path_to_models = self.path_to_models + '/'
-
-
-        if (path_to_filters is None):
-            self.path_to_filters = str(Path(__file__).parent.resolve()) + '/../filters/'
-        else:
-            self.path_to_filters = path_to_filters
-            if(self.path_to_filters[-1] != '/'): self.path_to_filters = self.path_to_filters + '/'
+        self.modeldir = files('lightning.data.models')
 
         # Build the actual model -- if the model isn't
         # read in from files, _construct_model should still at
@@ -146,7 +135,7 @@ class XrayEmissionModel(BaseEmissionModel):
             Load the filters.
         '''
 
-        self.filters = get_filters(self.filter_labels, self.wave_grid_obs, self.path_to_filters)
+        self.filters = get_filters(self.filter_labels, self.wave_grid_obs)
 
     def get_model_countrate_hires(self, params):
         '''

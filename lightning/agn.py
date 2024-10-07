@@ -89,9 +89,12 @@ class AGNModel(BaseEmissionModel):
         '''
         Load the models from file. This code is executed before _get_filters.
         '''
-        self.path_to_models = self.path_to_models + 'agn/stalevski2016/'
 
-        source_table = Table.read(self.path_to_models + 'SKIRTOR.fits.gz')
+        self.modeldir = self.modeldir.joinpath('agn/stalevski2016/')
+        with self.modeldir.joinpath('SKIRTOR.fits.gz').open('rb') as f:
+            source_table = Table.read(f, format='fits')
+
+        #source_table = Table.read(self.path_to_models + 'SKIRTOR.fits.gz')
         # Columns:
         # ['INCLINATION',
         #  'TAU',

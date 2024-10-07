@@ -1,5 +1,6 @@
 
 from pathlib import Path
+from importlib.resources import files
 import numpy as np
 
 from scipy.integrate import trapz
@@ -20,7 +21,7 @@ class BaseEmissionModel():
     param_names_fncy = [r'None']
     param_bounds = np.array([None, None]).reshape(1,2)
 
-    def __init__(self, filter_labels, redshift, path_to_models=None, path_to_filters=None, **kwargs):
+    def __init__(self, filter_labels, redshift, **kwargs):
         '''
             Generic initialization. Actual model-building should be handled by implementing the `construct_model` and
             `construct_model_grid` methods.
@@ -29,18 +30,7 @@ class BaseEmissionModel():
         self.redshift = redshift
         self.filter_labels = filter_labels
 
-        if (path_to_models is None):
-            self.path_to_models = str(Path(__file__).parent.resolve()) + '/models/'
-        else:
-            self.path_to_models = path_to_models
-            if(self.path_to_models[-1] != '/'): self.path_to_models = self.path_to_models + '/'
-
-
-        if (path_to_filters is None):
-            self.path_to_filters = str(Path(__file__).parent.resolve()) + '/filters/'
-        else:
-            self.path_to_filters = path_to_filters
-            if(self.path_to_filters[-1] != '/'): self.path_to_filters = self.path_to_filters + '/'
+        self.modeldir = files('lightning.data.models')
 
         # Build the actual model
         self._construct_model(**kwargs)
@@ -93,7 +83,7 @@ class BaseEmissionModel():
             Load the filters.
         '''
 
-        self.filters = get_filters(self.filter_labels, self.wave_grid_obs, self.path_to_filters)
+        self.filters = get_filters(self.filter_labels, self.wave_grid_obs)
 
     def _get_wave_obs(self):
         '''
