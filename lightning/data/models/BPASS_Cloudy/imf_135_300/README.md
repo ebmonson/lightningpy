@@ -1,6 +1,14 @@
 # BPASS Cloudy Models
 ---
 
+Files you should put in this folder
+```
+BPASS_imf135_300_z*_gr.h5
+BPASS_imf135_300_z*_ng.h5
+```
+A tarball containing these files is available with the other models.
+
+
 BPASS models after reprocessing by CLOUDY with a ~reasonable
 set of default parameters (from https://bpass.auckland.ac.nz/4.html):
 
@@ -32,4 +40,4 @@ The IMF is the default BPASS IMF, a two-slope Kroupa IMF from
 
 The spectra have been re-binned to 5 Å from the default 1 Å bins. Age bins are given by their centers, except for the first bin, which covers t=0 to 10^6.05 years.
 
-The Cloudy-processed spectra by default only cover 1-30000 Å and t=0-10^7.5 years. I've stitched them together with the corresponding BPASS source models to cover the full 1-100000 Å and t=0-10^11 years.
+The Cloudy-processed spectra by default only cover 1-30000 Å and t=0-10^7.5 years. They have been stitched together with the corresponding BPASS source models to cover the full 1-100000 Å and t=0-10^11 years.

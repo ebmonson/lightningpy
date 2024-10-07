@@ -18,6 +18,7 @@ import time
 import warnings
 import numbers
 from pathlib import Path
+from importlib.resources import files
 # Scipy/numpy
 import numpy as np
 from scipy.integrate import trapz
@@ -138,8 +139,6 @@ class Lightning:
         is explicitly given by the ARF. Only used if ``xray_mode='counts'``. (Default: None)
     galactic_NH : float
         A scalar giving the Galactic column density along the line of sight to the source in *1e20 cm-2*. (Default: 0.0)
-    lightning_filter_path : str
-        Path to lightning filters. Not actually used.
     print_setup_time : bool
         If ``True``, the setup time will be printed. (Default: False)
     model_unc : np.ndarray, (Nfilters,), float, or float
@@ -215,7 +214,6 @@ class Lightning:
                  xray_arf=None,
                  xray_exposure=None,
                  galactic_NH=0.0,
-                 lightning_filter_path=None,
                  print_setup_time=False,
                  model_unc=None,
                  model_unc_lines=None,
@@ -223,7 +221,6 @@ class Lightning:
                  uplim_handling='exact'):
 
         self.filter_labels = filter_labels
-        self.path_to_filters = lightning_filter_path
 
         # Cosmology
         if (cosmology is None):
@@ -275,10 +272,11 @@ class Lightning:
 
         # ... and line fluxes
         if (line_labels is None) or (str(line_labels) == 'default'):
-            path_to_linelist = str(Path(__file__).parent.resolve()) + '/models/'
-            self.line_labels = np.loadtxt(path_to_linelist + 'linelist_default.txt', dtype='<U16')
+            with files('lightning.data.models').joinpath('linelist_default.txt').open('r') as f:
+                self.line_labels = np.loadtxt(f, dtype='<U16')
         elif (str(line_labels) == 'full'):
-            self.line_labels = np.loadtxt(path_to_linelist + 'linelist_full.txt', dtype='<U16')
+            with files('lightning.data.models').joinpath('linelist_full.txt').open('r') as f:
+                self.line_labels = np.loadtxt(f, dtype='<U16')
         else:
             self.line_labels = np.array(line_labels)
 
@@ -711,7 +709,7 @@ class Lightning:
         Load the filters.
         '''
 
-        self.filters = get_filters(self.filter_labels, self.wave_grid_obs, self.path_to_filters)
+        self.filters = get_filters(self.filter_labels, self.wave_grid_obs)
 
 
     def _get_wave_obs(self):
@@ -2191,7 +2189,7 @@ class Lightning:
                 'xray_arf': arf_tmp,
                 'xray_exposure': None if self.xray_exposure is None else self.xray_exposure.tolist(),
                 'galactic_NH': float(self.galactic_NH),
-                'lightning_filter_path': self.path_to_filters,
+                #'lightning_filter_path': self.path_to_filters,
                 'model_unc': self.model_unc.tolist(),
                 'cosmology': {'H0': self.cosmology._H0.value,
                               'Om0': self.cosmology._Om0
