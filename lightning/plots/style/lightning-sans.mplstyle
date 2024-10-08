@@ -1,0 +1,71 @@
+#### LINES
+## See http://matplotlib.org/api/artist_api.html#module-matplotlib.lines for more
+## information on line properties.
+lines.linewidth   : 1.5     ## line width in points
+lines.linestyle   : -       ## solid line
+#lines.color       : C0      ## has no affect on plot(); see axes.prop_cycle
+lines.marker      :     ## the default marker
+lines.markerfacecolor: none
+#lines.markeredgewidth  : 1.0     ## the line width around the marker symbol
+lines.markersize  : 6            ## markersize, in points
+#lines.dash_joinstyle : round        ## miter|round|bevel
+lines.dash_capstyle : projecting          ## butt|round|projecting
+#lines.solid_joinstyle : round       ## miter|round|bevel
+lines.solid_capstyle : projecting   ## butt|round|projecting
+#lines.antialiased : True         ## render lines in antialiased (no jaggies)
+
+#### ERRORBARS
+errorbar.capsize : 2.0	 ## projecting error bar caps
+
+#### FONTS
+font.family         : sans-serif
+font.sans-serif     : DejaVu Sans, Bitstream Vera Sans, Lucida Grande, Verdana, Geneva, Lucid, Arial,  Avant Garde, sans-serif
+#font.serif         : DejaVu Serif, Times New Roman, Bitstream Vera Serif, New Century Schoolbook, Century Schoolbook L, Utopia, ITC Bookman, Bookman, Nimbus Roman No9 L, Palatino, Charter, serif
+font.style          : normal
+font.variant        : normal
+font.weight         : normal
+font.stretch        : normal
+font.size           : 12.0
+
+#### TEXT
+text.usetex         : False
+#mathtext.fontset : cm
+mathtext.fontset : dejavusans
+mathtext.default : it
+
+#### TICKS
+xtick.direction	      : in
+xtick.major.size    : 6
+xtick.minor.size    : 3
+xtick.labelsize : 10
+xtick.minor.visible: True   # visibility of minor ticks on x-axis
+xtick.major.top:     False    # draw x axis top major ticks
+xtick.major.bottom:  True    # draw x axis bottom major ticks
+xtick.minor.top:     False    # draw x axis top minor ticks
+xtick.minor.bottom:  True    # draw x axis bottom minor ticks
+xtick.alignment:     center  # alignment of xticks
+
+ytick.direction	      : in
+ytick.major.size    : 6
+ytick.minor.size    : 3
+ytick.labelsize : 10
+ytick.minor.visible: True   # visibility of minor ticks on y-axis
+ytick.major.left:    True    # draw y axis left major ticks
+ytick.major.right:   False    # draw y axis right major ticks
+ytick.minor.left:    True    # draw y axis left minor ticks
+ytick.minor.right:   False    # draw y axis right minor ticks
+ytick.alignment:     center_baseline  # alignment of yticks
+
+#### AXES
+axes.prop_cycle    : cycler('color', ['black', 'red', 'dodgerblue', 'orange', 'limegreen', 'darkviolet', 'slategrey', 'deeppink'])
+axes.titlesize : 12
+axes.labelsize : 12
+axes.edgecolor : black
+
+axes.formatter.use_mathtext: True  # When True, use mathtext for scientific
+                                     # notation.
+#axes.formatter.min_exponent: 3  # minimum exponent to format in scientific notation
+
+#### LEGEND
+legend.fontsize : 10
+legend.frameon : False
