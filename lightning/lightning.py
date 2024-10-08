@@ -2119,7 +2119,7 @@ class Lightning:
                 final_samples[-1*Nleft:,~const_dim] = samples[:,:]
                 final_samples[-1*Nleft:,const_dim] = const_vals[None,:]
 
-                final_logprob_samples = np.nan + np.zeros((Nsamples, self.Nparams))
+                final_logprob_samples = np.nan + np.zeros(Nsamples)
                 final_logprob_samples[-1*Nleft:] = logprob_samples[-1*Nsamples:]
                 return final_samples, final_logprob_samples, t
             else:
