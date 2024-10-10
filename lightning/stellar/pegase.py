@@ -104,7 +104,7 @@ class PEGASEModel(BaseEmissionModel):
             fnames = ['Kroupa01_Z%5.3f_nebular_spec.idl' % (Z_met) for Z_met in Zgrid]
         else:
             # self.path_to_models = [self.path_to_models + 'PEGASE/legacy/Kroupa01/' + 'Kroupa01_Z%5.3f_spec.idl' % (Z_met) for Z_met in Zgrid]
-            fname = ['Kroupa01_Z%5.3f_spec.idl' % (Z_met) for Z_met in Zgrid]
+            fnames = ['Kroupa01_Z%5.3f_spec.idl' % (Z_met) for Z_met in Zgrid]
 
         # burst_dict = readsav(self.path_to_models[0]) # Read in the first file to get the ages, wavelength, etc.
         burst_dict = readsav(str(self.modeldir.joinpath(fnames[0])))
@@ -703,12 +703,6 @@ class PEGASEModelA24(BaseEmissionModel):
     line_labels : np.ndarray, (Nlines,), string, optional
         Line labels in the format used by pyCloudy. See `lightning/models/linelist_full.txt` for the
         complete list of lines in the grid and their format.
-    nebula_old : bool
-        If ``True``, the spectra will include nebular extinction and emission at ages older than 50 Myr, modeling
-        the nebular contributions of the hot, stripped cores of evolved massive stars. While the the conditions we assume
-        for the nebula are most appropriate for massive H II regions, Byler+(2017) found that nebular emission from
-        post-AGB stars is not super sensitive to the geometry/density of the nebula, but it may be worth fitting your
-        galaxies with and without this component if you're concerned.
     dust_grains : bool
         If ``True``, then dust grains are included in the Cloudy grids. (Default: False)
     wave_grid : np.ndarray, (Nwave,), float, optional
@@ -744,7 +738,7 @@ class PEGASEModelA24(BaseEmissionModel):
 
     def _construct_model(self, age=None, lognH=2.0, step=True,
                          wave_grid=None, cosmology=None,
-                         nebular_effects=True, line_labels=None, nebula_old=True, dust_grains=False):
+                         nebular_effects=True, line_labels=None, dust_grains=False):
         '''
             Load the appropriate models from the PEGASE h5 files and either integrate
             them in bins (if ``step==True``) or interpolate them to an age grid otherwise.
@@ -805,9 +799,13 @@ class PEGASEModelA24(BaseEmissionModel):
         if (nebular_effects):
 
             if (line_labels is None) or (str(line_labels) == 'default'):
-                self.line_labels = np.loadtxt(self.path_to_linelist + 'linelist_default.txt', dtype='<U16')
+                with self.path_to_linelist.joinpath('linelist_default.txt').open('rb') as lf:
+                    self.line_labels = np.loadtxt(lf, dtype='<U16')
+                # self.line_labels = np.loadtxt(self.path_to_linelist + 'linelist_default.txt', dtype='<U16')
             elif str(line_labels) == 'full':
-                self.line_labels = np.loadtxt(self.path_to_linelist + 'linelist_full.txt', dtype='<U16')
+                with self.path_to_linelist.joinpath('linelist_full.txt').open('rb') as lf:
+                    self.line_labels = np.loadtxt(lf, dtype='<U16')
+                # self.line_labels = np.loadtxt(self.path_to_linelist + 'linelist_full.txt', dtype='<U16')
             else:
                 self.line_labels = line_labels
 
@@ -840,7 +838,6 @@ class PEGASEModelA24(BaseEmissionModel):
 
             lnu_model = f['spec/noneb'][:,:,:]
             mstar = f['mstar'][:]
-            mstar_rem = f['mstar_remnants'][:,:]
             q0 = 10**f['logq0'][:,:]
             lbol = f['Lbol'][:,:]
 
@@ -857,7 +854,7 @@ class PEGASEModelA24(BaseEmissionModel):
 
 
         f.close()
-        
+
         wave_model_obs = wave_model * (1 + self.redshift)
         nu_model_obs = nu_model / (1 + self.redshift)
 
