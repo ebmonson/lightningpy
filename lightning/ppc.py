@@ -244,7 +244,8 @@ def ppc_sed(lgh, samples, logprob_samples, Nrep=1000, seed=None, ax=None, normal
             else:
                 raise ValueError("'counts_dist' must be either 'poisson' or 'gaussian'.")
 
-            Lmod_xray_perturbed = lgh.xray_counts[None,xray_mask] / counts_perturbed[:,xray_mask] * Lmod_xray[:,xray_mask]
+            # Lmod_xray_perturbed = lgh.xray_counts[None,xray_mask] / counts_perturbed[:,xray_mask] * Lmod_xray[:,xray_mask]
+            Lmod_xray_perturbed = counts_perturbed[:,xray_mask] / lgh.xray_counts[None,xray_mask] * Lmod_xray[:,xray_mask]
 
         else:
             lnu_obs_xray = lgh.Lnu_obs[xray_mask]
