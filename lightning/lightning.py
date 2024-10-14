@@ -470,7 +470,7 @@ class Lightning:
         allowed_xray_agn_em = ['AGN-Plaw', 'QSOSED', 'None', None]
         allowed_xray_abs = ['tbabs', 'phabs', 'None', None]
         if xray_stellar_emission not in allowed_xray_st_em:
-            print('Allowed X-ray stellar emission models are:', allowed_xray_at_em)
+            print('Allowed X-ray stellar emission models are:', allowed_xray_st_em)
             raise ValueError("X-ray stellar emission type '%s' not understood." % (xray_stellar_emission))
         else:
             self.xray_st_em_type = xray_stellar_emission
