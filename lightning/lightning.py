@@ -218,7 +218,7 @@ class Lightning:
                  model_unc=None,
                  model_unc_lines=None,
                  cosmology=None,
-                 uplim_handling='exact'):
+                 uplim_handling='approx'):
 
         self.filter_labels = filter_labels
 
@@ -335,6 +335,9 @@ class Lightning:
 
         if (uplim_handling not in ['exact', 'approx']):
             raise ValueError("Options for 'uplim_handling' are 'exact' and 'approx'.")
+        if (uplim_handling == 'exact'):
+            warnings.warn('"exact" upper limit handling is a recent addition and requires more real-world testing.\nIt may produce unintended results, especially when fitting X-ray upper limits.\nApproach with caution, or use "approx" upper limit handling.\nSee the FAQ if unsure about how to provide upper limits.',
+                          AstropyUserWarning)
         self.uplim_handling = uplim_handling
 
         # Initialize wavelength grid
