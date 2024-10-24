@@ -7,8 +7,8 @@ environment with the required dependencies, and then installing the package loca
 
 .. code-block:: bash
 
-    git clone https://github.com/ebmonson/plightning.git
-    cd plightning
+    git clone https://github.com/ebmonson/lightningpy.git
+    cd lightningpy
     conda env create -f environment.yml
     conda activate lightning
     pip install .  --no-deps

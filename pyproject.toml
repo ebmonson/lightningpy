@@ -3,7 +3,7 @@ requires = ["setuptools>=45", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "plightning"
+name = "lightningpy"
 description = "Lightning SED fitting code."
 dynamic = ["version"]
 readme = "README.md"
@@ -31,10 +31,10 @@ dependencies = [
 ]
 
 [project.urls]
-Documentation = "https://github.com/ebmonson/plightning#readme"
-Issues = "https://github.com/ebmonson/plightning/issues"
-Source = "https://github.com/ebmonson/plightning"
-Repository = "https://github.com/ebmonson/plightning.git"
+Documentation = "https://github.com/ebmonson/lightningpy#readme"
+Issues = "https://github.com/ebmonson/lightningpy/issues"
+Source = "https://github.com/ebmonson/lightningpy"
+Repository = "https://github.com/ebmonson/lightningpy.git"
 
 [tool.setuptools]
 packages = ["lightning"]
@@ -59,7 +59,7 @@ docs = [  # Required for ReadTheDocs
 ]
 
 # [tool.setuptools_scm]
-# write_to = "plightning/_version.py"
+# write_to = "lightningpy/_version.py"
 
 # TODO: Set up ruff linter and formater settings
 [tool.ruff]

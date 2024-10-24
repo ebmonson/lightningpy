@@ -28,8 +28,8 @@ Currently, `lightning.py` is not available on [PyPI](https://pypi.org/) or [cond
 Until it is uploaded, `lightning.py` and its dependencies can be installed by cloning the repo, creating a conda environment with the required dependencies, and then installing the package:
 
 ```sh
-git clone https://github.com/ebmonson/plightning.git
-cd plightning
+git clone https://github.com/ebmonson/lightningpy.git
+cd lightningpy
 conda env create -f environment.yml
 conda activate lightning
 pip install .  --no-deps
@@ -37,8 +37,8 @@ pip install .  --no-deps
 
 ## Documentation
 ---
-Online documentation for the package can be found on [its readthedocs page](https://github.com/ebmonson/plightning),
-and a compiled PDF version of the documentation is available [in this repository](https://github.com/ebmonson/plightning/blob/main/docs/lightningpy.pdf).
+Online documentation for the package can be found on [its readthedocs page](https://github.com/ebmonson/lightningpy),
+and a compiled PDF version of the documentation is available [in this repository](https://github.com/ebmonson/lightningpy/blob/main/docs/lightningpy.pdf).
 
 
 ## License
