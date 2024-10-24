@@ -1,3 +1,5 @@
+.. _postproc-link:
+
 Postprocessing
 ==============
 

@@ -22,7 +22,7 @@ copyright = '2023-2024, Erik B. Monson'
 author = 'Erik B. Monson'
 
 # The full version, including alpha/beta/rc tags
-release = 'v2024.1'
+release = 'v2024.1.0'
 
 
 # -- General configuration ---------------------------------------------------

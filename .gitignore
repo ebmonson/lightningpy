@@ -15,6 +15,9 @@ testbench.ipynb
 *.pkl
 *.py~
 
+examples/fit_qsosed_sim_demo.ipynb
+examples/fit_sim_AGN_demo.ipynb
+
 tests/*.h5
 tests/tests.err
 tests/tests.out

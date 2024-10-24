@@ -12,6 +12,10 @@ Two convenience items are also implemented in this module: the ``ModelBand`` cla
 ``step_curve`` function designed to make plotting step functions with shaded uncertainties easier. Both are mostly meant
 for internal use, but are documented below for completeness.
 
+We also provide three ``matplotlib`` style sheets (mainly for consistency across the examples) which can be loaded
+using ``matplotlib.pyplot.style.use(name)`` where ``name`` is one of
+``[lightning-serif, lightning-sans, lightning-dark]``.
+
 .. automodule:: lightning.plots
     :members:
     :show-inheritance:

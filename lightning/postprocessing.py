@@ -256,12 +256,9 @@ def postprocess_catalog(res_filenames,
                         model_mode='json',
                         names=None,
                         catalog_name='postprocessed_catalog.hdf5'):
-    '''Given lists of chain files and model files, merge the results into a postprocessed catalog.
+    '''Given lists of result files and model files, merge the results into a postprocessed catalog.
 
-    This postprocessing script is for *samplers*, not for maximum likelihood methods. Luckily
-    I haven't fully implemented any of the maximum likelihood methods yet.
-
-    This script uses h5py to produce an output file in HDF5 format. I've made this choice to allow for
+    This script uses h5py to produce an output file in HDF5 format. We've made this choice to easily allow for
     non-homogeneous model setups, e.g. different numbers of bandpasses and parameters per source.
     The structure and content of the HDF5 file is as follows (for each source)::
 

@@ -4,11 +4,11 @@
    contain the root `toctree` directive.
 
 Lightning
-======================================
+=========
 
 ``lightning.py`` is the python version of the Lightning SED-fitting code.
 The goal of the project is to maintain Lightning's primary design philosophy
-of simplicty and physically-based models, while taking advantage of Python's
+of simplicity and physically-based models, while taking advantage of Python's
 object-oriented nature and the wide array of pre-existing astronomical Python
 code to improve modularity and user-friendliness.
 
@@ -22,16 +22,19 @@ disk galaxies are encouraged to continue to use IDL ``Lightning`` for their anal
 if it would be nice to access that model through ``lightning.py``.
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Documentation
 
    installation
-   getting_started
+   getting_started.ipynb
    model_choice
    solver_choice
+   catalog_postprocessing
    examples
+   model_library
    nebular_emission_recipe
    filter_profiles
+   faq
    API_reference
 
 Attribution
@@ -65,9 +68,9 @@ License
 
 Acknowledgments
 ===============
-``lightning.py`` was primarily developed by Erik B. Monson, with significant contributions from Amirnezam Amiri, Keith
-Doore, and Rafael Eufrasio. Much of ``lightning.py`` is outright ported from or at least heavily based on code from
-IDL ``Lightning``, which was developed by Rafael Eurfrasio, Keith Doore, and Erik B. Monson.
+``lightning.py`` has been developed by Erik B. Monson, Amirnezam Amiri, Keith
+Doore, and Rafael Eufrasio. Much of ``lightning.py`` is ported from or based on code from
+IDL ``Lightning``, which was developed by Rafael Eufrasio, Keith Doore, and Erik B. Monson.
 
 Indices and tables
 ==================

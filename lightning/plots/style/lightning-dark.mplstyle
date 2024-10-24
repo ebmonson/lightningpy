@@ -44,6 +44,8 @@ xtick.major.bottom:  True    # draw x axis bottom major ticks
 xtick.minor.top:     False    # draw x axis top minor ticks
 xtick.minor.bottom:  True    # draw x axis bottom minor ticks
 xtick.alignment:     center  # alignment of xticks
+xtick.color:         white   # color of the ticks
+xtick.labelcolor:    inherit
 
 ytick.direction	      : in
 ytick.major.size    : 6
@@ -55,6 +57,8 @@ ytick.major.right:   False    # draw y axis right major ticks
 ytick.minor.left:    True    # draw y axis left minor ticks
 ytick.minor.right:   False    # draw y axis right minor ticks
 ytick.alignment:     center_baseline  # alignment of yticks
+ytick.color:         white   # color of the ticks
+ytick.labelcolor:    inherit
 
 #### AXES
 axes.prop_cycle    : cycler('color', ['white', 'red', 'dodgerblue', 'orange', 'limegreen', 'darkviolet', 'slategrey', 'deeppink'])

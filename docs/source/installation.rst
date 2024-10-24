@@ -1,19 +1,14 @@
 Installation
 ============
 
-To install Lightning, all you need to do is clone the git repository
-to a location of your choosing and then add that location to your
-``PYTHONPATH`` system variable.
+Currently, ``lightning`` is not available on `PyPI <https://pypi.org/>`_ or `conda-forge <https://conda-forge.org/>`_.
+Until it is uploaded, ``lightning`` and its dependencies can be installed by cloning the repo, creating a conda
+environment with the required dependencies, and then installing the package locally:
 
-Dependencies must be handled manually because Erik has never looked up
-how ``setuptools`` works::
+.. code-block:: bash
 
-    - numpy
-    - scipy
-    - emcee
-    - corner
-    - h5py
-    - astropy
-
-That said, you probably have compatible versions of all of the above already,
-and if you don't they can be installed through ``conda`` very easily.
+    git clone https://github.com/ebmonson/plightning.git
+    cd plightning
+    conda env create -f environment.yml
+    conda activate lightning
+    pip install .  --no-deps
