@@ -14,8 +14,8 @@ object-oriented nature and the wide array of pre-existing astronomical Python
 code to improve modularity and user-friendliness.
 
 The IDL version of `Lightning` is now considered the "legacy" version, and will not
-see further development. Its documentation will remain available at `lightning-sed.readthedocs.io <https://lightning-sed.readthedocs.io>`_,
-and the source code can still be downloaded from `github.com/rafaeleufrasio/lightning <https://www.github.com/rafaeleufrasio/lightning>`_.
+see further development. Its documentation will remain available at [lightning-sed.readthedocs.io](https://lightning-sed.readthedocs.io),
+and the source code can still be downloaded from [github.com/rafaeleufrasio/lightning](https://www.github.com/rafaeleufrasio/lightning).
 
 This new python version contains all the features of IDL `Lightning` with the current notable exception of the
 Doore+(2021) inclination-dependent attenuation model. Users interested in the properties of highly-inclined
