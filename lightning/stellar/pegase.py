@@ -11,7 +11,7 @@ import astropy.units as u
 import astropy.constants as const
 
 from scipy.interpolate import interp1d, interpn
-from scipy.integrate import trapz
+from scipy.integrate import trapezoid as trapz
 from scipy.io import readsav
 
 from ..base import BaseEmissionModel

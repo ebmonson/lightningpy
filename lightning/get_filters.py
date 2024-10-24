@@ -6,7 +6,7 @@ import astropy.constants as const
 import numpy as np
 import json
 from scipy.interpolate import interp1d
-from scipy.integrate import trapz
+from scipy.integrate import trapezoid as trapz
 from importlib.resources import files
 
 __all__ = ['get_filters']

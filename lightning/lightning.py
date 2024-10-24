@@ -21,7 +21,7 @@ from pathlib import Path
 from importlib.resources import files
 # Scipy/numpy
 import numpy as np
-from scipy.integrate import trapz
+from scipy.integrate import trapezoid as trapz
 from scipy.interpolate import interp1d
 from scipy.special import erf
 # Astropy

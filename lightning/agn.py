@@ -9,7 +9,7 @@
 '''
 
 import numpy as np
-from scipy.integrate import trapz
+from scipy.integrate import trapezoid as trapz
 from scipy.interpolate import interp1d, interpn
 import astropy.constants as const
 import astropy.units as u
