@@ -827,7 +827,7 @@ class BPASSModelA24(BaseEmissionModel):
 
     def _construct_model(self, age=None, lognH=2.0, step=True,
                          wave_grid=None, cosmology=None, binaries=True, ULX=False,
-                         nebular_effects=True, line_labels=None, nebula_old=True, dust_grains=False):
+                         nebular_effects=True, line_labels=None, nebula_old=False, dust_grains=False):
         '''
             Load the appropriate models from the BPASS h5 files and either integrate
             them in bins (if ``step==True``) or interpolate them to an age grid otherwise.
@@ -1436,7 +1436,7 @@ class BPASSBurstA24(BPASSModelA24):
     '''
 
     def __init__(self, filter_labels, redshift, wave_grid=None, age=None, lognH=2.0, cosmology=None,
-                 line_labels=None, dust_grains=False, ULX=False):
+                 line_labels=None, dust_grains=False, nebula_old=False, ULX=False):
 
         if cosmology is None:
             from astropy.cosmology import FlatLambdaCDM
@@ -1446,7 +1446,7 @@ class BPASSBurstA24(BPASSModelA24):
 
         # "Erik googled how super() works after 15 years"
         super().__init__(filter_labels, redshift, step=False, wave_grid=wave_grid, age=age, lognH=lognH, cosmology=cosmology,
-                         line_labels=line_labels, dust_grains=dust_grains, ULX=ULX)
+                         line_labels=line_labels, dust_grains=dust_grains, nebula_old=nebula_old, ULX=ULX)
 
         # Overwrite parameters for clarity
         self.nebular = True # Why wouldn't you
