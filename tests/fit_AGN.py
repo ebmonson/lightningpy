@@ -44,7 +44,7 @@ def main():
                          const_dim=const_dim,
                          Nwalkers=Nwalkers,
                          Nsteps=Nsteps,
-                         progress=True
+                         progress=False
                          )
     chain, logprob_chain, tau = lgh_agn.get_mcmc_chains(sampler,
                                                        discard=1000,
@@ -60,7 +60,7 @@ def main():
 
     mcmc_med = np.median(chain, axis=0)
 
-    bounds = 5 * [(10,10)] +\
+    bounds = 5 * [(0,10)] +\
              [(0.020, 0.020), (-2,-2)] +\
              [(0,3)] +\
              [(2,2), (0.1, 25), (3e5, 3e5), (0,1), (0.0047, 0.0458)] +\
@@ -79,7 +79,7 @@ def main():
                      method='optimize',
                      MCMC_followup=True,
                      force=True,
-                     MCMC_kwargs={'Nwalkers':64,'Nsteps':1000,'progress':True, 'init_scale':1e-3},
+                     MCMC_kwargs={'Nwalkers':64,'Nsteps':1000,'progress':False, 'init_scale':1e-3},
                      disp=False,
                      bounds=bounds)
 
