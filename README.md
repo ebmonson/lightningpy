@@ -1,10 +1,12 @@
 # lightning.py
 
+[![Documentation Status](https://readthedocs.org/projects/lightningpy/badge/?version=latest)](https://lightningpy.readthedocs.io/en/latest/?badge=latest)
+
 > [!Note]
 >
 > The only stellar population models included in this distribution are the "legacy"
-> PEGASE models used in IDL Lightning. The recently developed BPASS + Cloudy
-> and PEGASE + Cloudy models used in Lehmer+(2024) must be [downloaded](https://www.dropbox.com/scl/fo/is74ra0tc1t0jdo4dsntm/ADDNjrtxro2euqCWmYrCO0Y?rlkey=9v113nb8rqgl5zul6xawuwdde&st=kzgq6kxr&dl=0) before they
+> PEGASE models used in IDL Lightning. The BPASS + Cloudy models produced by the BPASS collaboration and the recently developed BPASS + Cloudy
+> and PEGASE + Cloudy models used in Lehmer+(2024) must be [downloaded](https://www.dropbox.com/scl/fo/is74ra0tc1t0jdo4dsntm/ADDNjrtxro2euqCWmYrCO0Y?rlkey=9v113nb8rqgl5zul6xawuwdde&st=kzgq6kxr&dl=0) and placed in the appropriate model directories before they
 > can be used with Lightning.
 
 `lightning.py` is the python version of the Lightning SED-fitting code.
@@ -35,9 +37,24 @@ conda activate lightning
 pip install .  --no-deps
 ```
 
+Model files will then need to be downloaded and dropped in the appropriate directories of the installed package. If you're following the instructions above, the root directory for the models will be
+
+```
+path/to/conda/envs/lightning/lib/python3.XX/site-packages/lightning/data/models/
+```
+
+where `3.XX` should be replaced with the version of python used by your environment. You can locate your lightning install by opening a python terminal and doing
+
+```python
+>>> import lightning
+>>> print(lightning.__file__)
+```
+
+which will show you the root of the lightning install.
+
 ## Documentation
 ---
-Online documentation for the package can be found on [its readthedocs page](https://github.com/ebmonson/lightningpy),
+Online documentation for the package can be found on [its readthedocs page](https://lightningpy.readthedocs.io/en/latest/),
 and a compiled PDF version of the documentation is available [in this repository](https://github.com/ebmonson/lightningpy/blob/main/docs/lightningpy.pdf).
 
 
