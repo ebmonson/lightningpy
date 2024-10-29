@@ -17,7 +17,7 @@ see further development. Its documentation will remain available at `lightning-s
 and the source code can still be downloaded from `github.com/rafaeleufrasio/lightning <https://www.github.com/rafaeleufrasio/lightning>`_.
 
 This new python version contains all the features of IDL ``Lightning`` with the current notable exception of the
-Doore+(2021) inclination-dependent attenuation model. Users interested in the properties of highly-inclined
+`Doore et al. (2021) <https://ui.adsabs.harvard.edu/abs/2021ApJ...923...26D/abstract>`_ inclination-dependent attenuation model. Users interested in the properties of highly-inclined
 disk galaxies are encouraged to continue to use IDL ``Lightning`` for their analyses, and to let the authors know
 if it would be nice to access that model through ``lightning.py``.
 
@@ -40,8 +40,25 @@ if it would be nice to access that model through ``lightning.py``.
 Attribution
 ===========
 A paper describing ``lightning.py`` is forthcoming by Monson et al.; this page will be updated on submission. In the
-meantime, work using the new PEGASE+Cloudy and BPASS+Cloudy models are encouraged to also cite Lehmer et al. (2024), while
-work using models described in Doore et al. (2023) should also cite that paper::
+meantime, work using the new PEGASE+Cloudy and BPASS+Cloudy models are encouraged to also cite `Lehmer et al. (2024, in press at ApJS) <https://ui.adsabs.harvard.edu/abs/2024arXiv241019901L/abstract>`_::
+
+    @ARTICLE{2024arXiv241019901L,
+        author = {{Lehmer}, Bret D. and {Monson}, Erik B. and {Eufrasio}, Rafael T. and {Amiri}, Amirnezam and {Doore}, Keith and {Basu-Zych}, Antara and {Garofali}, Kristen and {Oskinova}, Lidia and {Andrews}, Jeff J. and {Antoniou}, Vallia and {Geda}, Robel and {Greene}, Jenny E. and {Kovlakas}, Konstantinos and {Lazzarini}, Margaret and {Richardson}, Chris T.},
+        title = "{An Empirical Framework Characterizing the Metallicity and Star-Formation History Dependence of X-ray Binary Population Formation and Emission in Galaxies}",
+        journal = {arXiv e-prints},
+        keywords = {Astrophysics - Astrophysics of Galaxies, Astrophysics - High Energy Astrophysical Phenomena},
+        year = 2024,
+        month = oct,
+        eid = {arXiv:2410.19901},
+        pages = {arXiv:2410.19901},
+        archivePrefix = {arXiv},
+        eprint = {2410.19901},
+        primaryClass = {astro-ph.GA},
+        adsurl = {https://ui.adsabs.harvard.edu/abs/2024arXiv241019901L},
+        adsnote = {Provided by the SAO/NASA Astrophysics Data System}
+    }
+
+Work using models described in `Doore et al. (2023) <https://ui.adsabs.harvard.edu/abs/2023ApJS..266...39D/abstract>`_ should also cite that paper::
 
     @ARTICLE{2023ApJS..266...39D,
         author = {{Doore}, Keith and {Monson}, Erik B. and {Eufrasio}, Rafael T. and {Lehmer}, Bret D. and {Garofali}, Kristen and {Basu-Zych}, Antara},
