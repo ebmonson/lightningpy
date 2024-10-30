@@ -97,6 +97,12 @@ def main():
         if (mod is not None) and (mod.Nparams != 0):
             param_names += mod.param_names
 
+    with h5py.File('chain_agn.h5', 'w') as f_out:
+        f_out.create_dataset('mcmc/samples', data=chain)
+        f_out.create_dataset('mcmc/logprob_samples', data=logprob_chain)
+        f_out.create_dataset('res/bestfit', data=res[0].x)
+        f_out.create_dataset('res/chi2_best', data=res[0].fun)
+
     t = Table()
     t['PARAM'] = param_names
     t['TRUTH'] = f['agn/truth']
@@ -104,6 +110,8 @@ def main():
     t['LBFGS_BESTFIT'] = res[0].x
     t['LBFGS_MED'] = lbfgs_med
     ascii.write(t, format='fixed_width_two_line')
+
+    f.close()
 
 if __name__ == '__main__':
 
