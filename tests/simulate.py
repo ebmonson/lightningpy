@@ -50,7 +50,7 @@ def main():
                        2, 1, 3e5, 0.1, 0.025])
 
     Lsim_bp, Lsim_bp_intr = lgh_bp.get_model_lnu(params)
-    lgh_bp.save_pickle('lgh_bpass.pkl')
+    # lgh_bp.save_pickle('lgh_bpass.pkl')
 
     print('...normal galaxy, PEGASE')
     lgh_pg = Lightning(filter_labels,
@@ -63,7 +63,7 @@ def main():
                        )
 
     Lsim_pg, Lsim_pg_intr = lgh_pg.get_model_lnu(params)
-    lgh_pg.save_pickle('lgh_pegase.pkl')
+    # lgh_pg.save_pickle('lgh_pegase.pkl')
 
     print('...single-age burst, BPASS')
     lgh_burst = Lightning(filter_labels,
@@ -80,7 +80,7 @@ def main():
                              2, 1, 3e5, 0.1, 0.025])
 
     Lsim_burst, Lsim_burst_intr = lgh_burst.get_model_lnu(params_burst)
-    lgh_burst.save_pickle('lgh_burst.pkl')
+    # lgh_burst.save_pickle('lgh_burst.pkl')
 
     print('...AGN w/ polar dust')
     lgh_agn = Lightning(filter_labels,
@@ -93,7 +93,7 @@ def main():
                         SFH_type='Piecewise-Constant',
                         model_unc=0.10)
     d_agn = lgh_agn.DL
-    lgh_agn.save_pickle('lgh_agn.pkl')
+    # lgh_agn.save_pickle('lgh_agn.pkl')
 
     params_agn = np.array([1,1,1,1,1,
                            0.02, -2.0,
@@ -125,6 +125,22 @@ def main():
     fsim_burst_unc = (fnu2lnu_gal * (Lsim_burst_unc * const.Lsun / u.Hz)).to(u.mJy).value
     fsim_agn = (fnu2lnu_agn * (Lsim_agn * const.Lsun / u.Hz)).to(u.mJy).value
     fsim_agn_unc = (fnu2lnu_agn * (Lsim_agn_unc * const.Lsun / u.Hz)).to(u.mJy).value
+
+    lgh_bp.flux_obs = fsim_bp
+    lgh_bp.flux_unc = fsim_bp_unc
+    lgh_bp.save_pickle('lgh_bpass.pkl')
+
+    lgh_pg.flux_obs = fsim_pg
+    lgh_pg.flux_unc = fsim_pg_unc
+    lgh_pg.save_pickle('lgh_pegase.pkl')
+
+    lgh_burst.flux_obs = fsim_burst
+    lgh_burst.flux_unc = fsim_burst_unc
+    lgh_burst.save_pickle('lgh_burst.pkl')
+
+    lgh_agn.flux_obs = fsim_agn
+    lgh_agn.flux_unc = fsim_agn_unc
+    lgh_agn.save_pickle('lgh_agn.pkl')
 
     with h5py.File('simulations.h5', 'w') as f:
 

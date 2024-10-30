@@ -8,6 +8,7 @@ from tqdm import tqdm
 from astropy.table import Table
 from lightning import Lightning
 from lightning.ppc import ppc
+from scipy.integrate import trapezoid
 
 import h5py
 
@@ -133,10 +134,15 @@ def postprocess_catalog_mcmc(chain_filenames,
 
             ##### PROPERTIES
             properties = source.create_group('properties')
-            if (lgh.sfh.type == 'piecewise'):
-                mstar = lgh.sfh.sum(sfh_params, lgh.stars.mstar)
+            # Appropriate conversions from SFR -> Mstar for our SFH and metallicity.
+            if (lgh.SFH_type == 'Piecewise-Constant'):
+                mstar_coeff = lgh.stars.get_mstar_coeff(stellar_params[:,0])
+                mstar = np.sum(sfh_params * mstar_coeff, axis=1)
+            elif (lgh.SFH_type == 'Burst'):
+                mstar = 10 ** stellar_params[:,0]
             else:
-                mstar = lgh.sfh.integrate(sfh_params, lgh.stars.mstar)
+                mstar_coeff = lgh.stars.get_mstar_coeff(stellar_params[:,0])
+                mstar = trapezoid(lgh.sfh.evaluate(sfh_params) * mstar_coeff, lgh.sfh.age, axis=1)
 
             mstar_q = np.nanquantile(mstar, q=(0.16, 0.50, 0.84))
 
@@ -145,7 +151,7 @@ def postprocess_catalog_mcmc(chain_filenames,
             properties.create_dataset('filter_labels', data=lgh.filter_labels)
             properties.create_dataset('lnu', data=lgh.Lnu_obs)
             properties.create_dataset('lnu_unc', data=lgh.Lnu_unc)
-            if (lgh.sfh.type == 'piecewise'):
+            if (lgh.SFH_type == 'Piecewise-Constant'):
                 properties.create_dataset('steps_bounds', data=lgh.ages)
 
             properties.create_dataset('mstar/lo', data=mstar_q[0])
@@ -202,7 +208,7 @@ def postprocess_catalog_mle(res_filenames,
                     lgh = pickle.load(f)
 
             ##### PARAMETERS
-            sfh_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = lgh._separate_params(bestfit)
+            sfh_params, stellar_params, atten_params, dust_params, agn_params, st_xray_params, agn_xray_params, xray_abs_params = lgh._separate_params(bestfit)
             parameters = source.create_group('parameters')
             if (sfh_params is not None):
                 for j,pname in enumerate(lgh.sfh.param_names):
@@ -228,10 +234,15 @@ def postprocess_catalog_mle(res_filenames,
 
             ##### PROPERTIES
             properties = source.create_group('properties')
-            if (lgh.sfh.type == 'piecewise'):
-                mstar = lgh.sfh.sum(sfh_params, lgh.stars.mstar)
+            # Appropriate conversions from SFR -> Mstar for our SFH and metallicity.
+            if (lgh.SFH_type == 'Piecewise-Constant'):
+                mstar_coeff = lgh.stars.get_mstar_coeff(stellar_params[:,0])
+                mstar = np.sum(sfh_params * mstar_coeff, axis=1)
+            elif (lgh.SFH_type == 'Burst'):
+                mstar = 10 ** stellar_params[:,0]
             else:
-                mstar = lgh.sfh.integrate(sfh_params, lgh.stars.mstar)
+                mstar_coeff = lgh.stars.get_mstar_coeff(stellar_params[:,0])
+                mstar = trapezoid(lgh.sfh.evaluate(sfh_params) * mstar_coeff, lgh.sfh.age, axis=1)
 
             #mstar_q = np.nanquantile(mstar, q=(0.16, 0.50, 0.84))
 
@@ -240,7 +251,7 @@ def postprocess_catalog_mle(res_filenames,
             properties.create_dataset('filter_labels', data=lgh.filter_labels)
             properties.create_dataset('lnu', data=lgh.Lnu_obs)
             properties.create_dataset('lnu_unc', data=lgh.Lnu_unc)
-            if (lgh.sfh.type == 'piecewise'):
+            if (lgh.SFH_type == 'Piecewise-Constant'):
                 properties.create_dataset('steps_bounds', data=lgh.ages)
 
             properties.create_dataset('mstar/best', data=mstar)
