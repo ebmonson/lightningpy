@@ -151,7 +151,7 @@ def postprocess_catalog_mcmc(chain_filenames,
             properties.create_dataset('filter_labels', data=lgh.filter_labels)
             properties.create_dataset('lnu', data=lgh.Lnu_obs)
             properties.create_dataset('lnu_unc', data=lgh.Lnu_unc)
-            if (lgh.SFH_type == 'piecewise'):
+            if (lgh.SFH_type == 'Piecewise-Constant'):
                 properties.create_dataset('steps_bounds', data=lgh.ages)
 
             properties.create_dataset('mstar/lo', data=mstar_q[0])
@@ -251,7 +251,7 @@ def postprocess_catalog_mle(res_filenames,
             properties.create_dataset('filter_labels', data=lgh.filter_labels)
             properties.create_dataset('lnu', data=lgh.Lnu_obs)
             properties.create_dataset('lnu_unc', data=lgh.Lnu_unc)
-            if (lgh.SFH_type == 'piecewise'):
+            if (lgh.SFH_type == 'Piecewise-Constant'):
                 properties.create_dataset('steps_bounds', data=lgh.ages)
 
             properties.create_dataset('mstar/best', data=mstar)
