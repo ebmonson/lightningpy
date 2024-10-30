@@ -142,7 +142,7 @@ def postprocess_catalog_mcmc(chain_filenames,
                 mstar = 10 ** stellar_params[:,0]
             else:
                 mstar_coeff = lgh.stars.get_mstar_coeff(stellar_params[:,0])
-                mstar = trapezoid(lgh.sfh.evaluate(sfh_params) * mstar_coeff, axis=1)
+                mstar = trapezoid(lgh.sfh.evaluate(sfh_params) * mstar_coeff, self.age, axis=1)
 
             mstar_q = np.nanquantile(mstar, q=(0.16, 0.50, 0.84))
 
@@ -242,7 +242,7 @@ def postprocess_catalog_mle(res_filenames,
                 mstar = 10 ** stellar_params[:,0]
             else:
                 mstar_coeff = lgh.stars.get_mstar_coeff(stellar_params[:,0])
-                mstar = trapezoid(lgh.sfh.evaluate(sfh_params) * mstar_coeff, axis=1)
+                mstar = trapezoid(lgh.sfh.evaluate(sfh_params) * mstar_coeff, self.age, axis=1)
 
             #mstar_q = np.nanquantile(mstar, q=(0.16, 0.50, 0.84))
 
