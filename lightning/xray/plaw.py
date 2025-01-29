@@ -87,7 +87,8 @@ class XrayPlaw(XrayEmissionModel):
 
         # Trying to avoid underflow
         countrate = np.log10(1 / (4 * np.pi)) - 2 * np.log10(self._DL_cm) + \
-                    np.log10(lnu_obs) + np.log10(self.specresp) - np.log10(self.phot_energ)
+                    np.log10(lnu_obs, where=(lnu_obs > 0), out=(-1000 + np.zeros_like(lnu_obs))) +\
+                    np.log10(self.specresp) - np.log10(self.phot_energ)
 
         # print(np.count_nonzero(self.phot_energ))
         # print(np.count_nonzero(lnu_rest))
@@ -275,7 +276,8 @@ class XrayPlawExpcut(XrayEmissionModel):
         lnu_obs = self.get_model_lnu_hires(params)
 
         countrate = np.log10(1 / (4 * np.pi * self._DL_cm ** 2)) + \
-                    np.log10(lnu_obs) + np.log10(self.specresp) - np.log10(self.phot_energ)
+                    np.log10(lnu_obs, where=(lnu_obs > 0), out=(-1000 + np.zeros_like(lnu_obs))) +\
+                    np.log10(self.specresp) - np.log10(self.phot_energ)
 
         countrate = 10 ** countrate
 

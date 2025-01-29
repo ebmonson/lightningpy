@@ -272,7 +272,8 @@ class StellarPlaw(XrayPlawExpcut):
             lnu_obs = lnu_obs.reshape(1,-1)
 
         countrate = np.log10(1 / (4 * np.pi)) - 2 * np.log10(self._DL_cm) + \
-                    np.log10(lnu_obs) + np.log10(self.specresp[None, :]) - np.log10(self.phot_energ[None,:])
+                    np.log10(lnu_obs, where=(lnu_obs > 0), out=(-1000 + np.zeros_like(lnu_obs))) +\
+                    np.log10(self.specresp[None, :]) - np.log10(self.phot_energ[None,:])
 
         countrate = 10 ** countrate
 

@@ -501,8 +501,16 @@ class BPASSModel(BaseEmissionModel):
             Zmet = params[:,0]
             logU = params[:,1]
 
+            # Lnu_obs = 10**interpn((self.Zmet, self.logU),
+            #                        np.log10(np.transpose(self.Lnu_obs, axes=[1,2,0,3])),
+            #                        params,
+            #                        method='linear')
+            
+            Lnu_transp = np.transpose(self.Lnu_obs, axes=[1,2,0,3])
             Lnu_obs = 10**interpn((self.Zmet, self.logU),
-                                   np.log10(np.transpose(self.Lnu_obs, axes=[1,2,0,3])),
+                                   np.log10(Lnu_transp, 
+                                            where=(Lnu_transp > 0), 
+                                            out=(np.zeros_like(Lnu_transp) - 1000.0)),
                                    params,
                                    method='linear')
 
@@ -716,8 +724,11 @@ class BPASSModel(BaseEmissionModel):
         assert (params.shape[0] == Nmodels), 'First dimension of logU array must match first dimension of SFH.'
 
         #print(self.line_lum)
+        lines_transp = np.transpose(self.line_lum, axes=[1,2,0,3])
         L_lines = 10**interpn((self.Zmet, self.logU),
-                             np.log10(np.transpose(self.line_lum, axes=[1,2,0,3])),
+                             np.log10(lines_transp,
+                                      where=(lines_transp > 0),
+                                      out=(np.zeros(lines_transp) - 1000.0)),
                              params,
                              method='linear')
         #print(L_lines)
@@ -1197,8 +1208,16 @@ class BPASSModelA24(BaseEmissionModel):
             Zmet = params[:,0]
             logU = params[:,1]
 
+            # Lnu_obs = 10**interpn((self.Zmet, self.logU),
+            #                        np.log10(np.transpose(self.Lnu_obs, axes=[1,2,0,3])),
+            #                        params,
+            #                        method='linear')
+            
+            Lnu_transp = np.transpose(self.Lnu_obs, axes=[1,2,0,3])
             Lnu_obs = 10**interpn((self.Zmet, self.logU),
-                                   np.log10(np.transpose(self.Lnu_obs, axes=[1,2,0,3])),
+                                   np.log10(Lnu_transp, 
+                                            where=(Lnu_transp > 0), 
+                                            out=(np.zeros_like(Lnu_transp) - 1000.0)),
                                    params,
                                    method='linear')
 
@@ -1405,8 +1424,11 @@ class BPASSModelA24(BaseEmissionModel):
         if np.any(ob_mask):
             raise ValueError('%d stellar param value(s) are out of bounds' % (np.count_nonzero(ob_mask)))
 
+        lines_transp = np.transpose(self.line_lum, axes=[1,2,0,3])
         L_lines = 10**interpn((self.Zmet, self.logU),
-                               np.log10(np.transpose(self.line_lum, axes=[1,2,0,3])),
+                               np.log10(lines_transp,
+                                        where=(lines_transp > 0),
+                                        out=(np.zeros_like(lines_transp))),
                                params,
                                method='linear')
 
@@ -1498,7 +1520,9 @@ class BPASSBurstA24(BPASSModelA24):
 
         # The axes go (age, Z, logU, wave)
         lnu_unattenuated = 10**interpn((self.age, self.Zmet, self.logU),
-                                 np.log10(self.Lnu_obs),
+                                 np.log10(self.Lnu_obs,
+                                          where=(self.Lnu_obs > 0),
+                                          out=(np.zeros_like(self.Lnu_obs) - 1000.0)),
                                  params[:,1:],
                                  method='linear')
 
@@ -1545,8 +1569,8 @@ class BPASSBurstA24(BPASSModelA24):
             params = params.reshape(1, -1)
 
 
-        if (self.step):
-            assert (sfh.type == 'piecewise'), 'Binned stellar populations require a piecewise-defined SFH.'
+        # if (self.step):
+        #     assert (sfh.type == 'piecewise'), 'Binned stellar populations require a piecewise-defined SFH.'
 
         Nmodels = params.shape[0]
 
@@ -1618,7 +1642,9 @@ class BPASSBurstA24(BPASSModelA24):
             assert (exptau.shape[0] == Nmodels), 'First dimension of exptau must match first dimension of SFH.'
 
         L_lines = 10**interpn((self.age, self.Zmet, self.logU),
-                               np.log10(self.line_lum),
+                               np.log10(self.line_lum,
+                                        where=(self.line_lum > 0),
+                                        out=(np.zeros_like(self.line_lum) - 1000.0)),
                                params[:,1:],
                                method='linear')
 

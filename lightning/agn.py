@@ -246,22 +246,26 @@ class AGNModel(BaseEmissionModel):
         # dimension to be strictly ascending, so we invert cosi and the corresponding
         # dim. of the Lnu array.
         lnu_hires = 10 ** interpn((self._cosinc_vec[::-1], self._tau_vec),
-                                  np.log10(self.Lnu_obs)[::-1, :, :],
-                                  #params[:,1:],
-                                  params[:,1:3],
-                                  method='linear',
-                                  bounds_error=False,
-                                  fill_value=0.0)
+                                np.log10(self.Lnu_obs,
+                                        where=((self.Lnu_obs > 0) & np.isfinite(self.Lnu_obs)),
+                                        out=(np.zeros_like(self.Lnu_obs) - 1000.0))[::-1, :, :],
+                                #params[:,1:],
+                                params[:,1:3],
+                                method='linear',
+                                bounds_error=False,
+                                fill_value=0.0)
 
         # Interpolate the inclination-integrated spectrum to calculate the
         # bolometric luminosity
         lnu_integrated_hires = 10 ** interpn((self._cosinc_vec[::-1], self._tau_vec),
-                                              np.log10(self.Lnu_obs_integrated)[::-1, :, :],
-                                              # params[:,1:],
-                                              params[:,1:3],
-                                              method='linear',
-                                              bounds_error=False,
-                                              fill_value=0.0)
+                                            np.log10(self.Lnu_obs_integrated,
+                                                    where=((self.Lnu_obs_integrated > 0) & np.isfinite(self.Lnu_obs_integrated)),
+                                                    out=(np.zeros_like(self.Lnu_obs_integrated) - 1000.0))[::-1, :, :],
+                                            # params[:,1:],
+                                            params[:,1:3],
+                                            method='linear',
+                                            bounds_error=False,
+                                            fill_value=0.0)
 
         if (self.polar_dust_ext is not None):
             expmtau_polar = self.polar_dust_ext.evaluate(params[:,3])

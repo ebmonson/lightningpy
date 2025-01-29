@@ -218,7 +218,8 @@ class AGNPlaw(XrayPlawExpcut):
         lnu_obs, _ = self.get_model_lnu_hires(params, agn_model, agn_params, exptau=exptau)
 
         countrate = np.log10(1 / (4 * np.pi)) - 2 * np.log10(self._DL_cm) + \
-                    np.log10(lnu_obs) + np.log10(self.specresp) - np.log10(self.phot_energ)
+                    np.log10(lnu_obs, where=(lnu_obs > 0), out=(-1000 + np.zeros_like(lnu_obs))) +\
+                    np.log10(self.specresp) - np.log10(self.phot_energ)
 
         countrate = 10 ** countrate
 

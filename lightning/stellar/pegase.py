@@ -446,7 +446,11 @@ class PEGASEModel(BaseEmissionModel):
         # Comes out negative since self.nu_grid_obs is monotonically decreasing.
         #ages_L_TIR = np.abs(trapz(ages_lnu_unattenuated - ages_lnu_attenuated, self.nu_grid_obs, axis=2))
 
-        finterp = interp1d(self.Zmet, np.log10(self.Lnu_obs), axis=1)
+        finterp = interp1d(self.Zmet, 
+                           np.log10(self.Lnu_obs, 
+                                    where=(self.Lnu_obs > 0), 
+                                    out=(np.zeros_like(self.Lnu_obs) - 1000.0)), 
+                           axis=1)
         Lnu_obs = 10**finterp(params.flatten())
         Lnu_obs = np.swapaxes(Lnu_obs, 0, 1)
 
@@ -649,7 +653,11 @@ class PEGASEModel(BaseEmissionModel):
 
         assert (self.nebular), 'Models were created without nebular emission; there are no lines.'
 
-        finterp = interp1d(self.Zmet, np.log10(self.line_lum), axis=1)
+        finterp = interp1d(self.Zmet, 
+                           np.log10(self.line_lum,
+                                    where=(self.line_lum > 0),
+                                    out=(np.zeros_like(self.line_lum) - 1000.0)), 
+                           axis=1)
         L_lines = 10**finterp(params.flatten())
         L_lines = np.swapaxes(L_lines, 0, 1)
 
@@ -1066,11 +1074,14 @@ class PEGASEModelA24(BaseEmissionModel):
             Zmet = params[:,0]
             logU = params[:,1]
 
+            Lnu_transp = np.transpose(self.Lnu_obs, axes=[1,2,0,3])
             Lnu_obs = 10**interpn((self.Zmet, self.logU),
-                                   np.log10(np.transpose(self.Lnu_obs, axes=[1,2,0,3])),
+                                   np.log10(Lnu_transp, 
+                                            where=((Lnu_transp > 0) & (np.isfinite(Lnu_transp))), 
+                                            out=(np.zeros_like(Lnu_transp) - 1000.0)),
                                    params,
                                    method='linear')
-
+            
         else:
             # We need only interpolate in the metallicity dimension.
             finterp = interp1d(self.Zmet, np.log10(self.Lnu_obs), axis=1)
@@ -1274,8 +1285,11 @@ class PEGASEModelA24(BaseEmissionModel):
         if np.any(ob_mask):
             raise ValueError('%d stellar param value(s) are out of bounds' % (np.count_nonzero(ob_mask)))
 
+        lines_transp = np.transpose(self.line_lum, axes=[1,2,0,3])
         L_lines = 10**interpn((self.Zmet, self.logU),
-                               np.log10(np.transpose(self.line_lum, axes=[1,2,0,3])),
+                               np.log10(lines_transp,
+                                        where=(lines_transp > 0),
+                                        out=(np.zeros_like(lines_transp) - 1000.0)),
                                params,
                                method='linear')
 
@@ -1413,8 +1427,8 @@ class PEGASEBurstA24(PEGASEModelA24):
             params = params.reshape(1, -1)
 
 
-        if (self.step):
-            assert (sfh.type == 'piecewise'), 'Binned stellar populations require a piecewise-defined SFH.'
+        # if (self.step):
+        #     assert (sfh.type == 'piecewise'), 'Binned stellar populations require a piecewise-defined SFH.'
 
         Nmodels = params.shape[0]
 
@@ -1487,7 +1501,9 @@ class PEGASEBurstA24(PEGASEModelA24):
             assert (exptau.shape[0] == Nmodels), 'First dimension of exptau must match first dimension of SFH.'
 
         L_lines = 10**interpn((self.age, self.Zmet, self.logU),
-                               np.log10(self.line_lum),
+                               np.log10(self.line_lum,
+                                        where=(self.line_lum > 0),
+                                        out=(np.zeros_like(self.line_lum) - 1000.0)),
                                params[:,1:],
                                method='linear')
 

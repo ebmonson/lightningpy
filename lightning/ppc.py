@@ -48,6 +48,10 @@ def ppc(lgh, samples, logprob_samples, Nrep=1000, seed=None, counts_dist='gaussi
     sort = np.argsort(np.exp(logprob_samples))
     pdf = np.exp(logprob_samples)[sort]
     cdf = np.cumsum(pdf)
+    # For log probabilities < -745.0 or so, p is numerically 0
+    # and the CDF here is not defined. Hence the exercise fails.
+    if np.amax(cdf) == 0:
+        return 0.0, np.inf + np.zeros(Nrep), np.inf + np.zeros(Nrep)
     cdf /= np.amax(cdf)
 
     # Check if all elements of the CDF are finite?
@@ -67,14 +71,15 @@ def ppc(lgh, samples, logprob_samples, Nrep=1000, seed=None, counts_dist='gaussi
 
     # and perturbed by the uncertainties on the data
     total_unc2 = lgh.Lnu_unc[None,:]**2 + (lgh.model_unc * Lmod)**2
-    total_unc2[:, lgh.Lnu_unc == 0] = 0
+    missingbands = lgh.Lnu_unc == 0
+    total_unc2[:, missingbands] = 0
     Lmod_perturbed = rng.normal(loc=Lmod, scale=np.sqrt(total_unc2))
 
     # Lmod_perturbed are now fake "observed" data, assuming that the model is correct.
     # We calculate chi2 comparing these new "observations" with the original observations
     # and with the unperturbed Lmod.
-    chi2_obs = np.nansum((lgh.Lnu_obs[None,:] - Lmod)**2 / total_unc2, axis=-1)
-    chi2_rep = np.nansum((Lmod - Lmod_perturbed)**2 / total_unc2, axis=-1)
+    chi2_obs = np.nansum((lgh.Lnu_obs[None,~missingbands] - Lmod[:,~missingbands])**2 / total_unc2[:,~missingbands], axis=-1)
+    chi2_rep = np.nansum((Lmod[:,~missingbands] - Lmod_perturbed[:,~missingbands])**2 / total_unc2[:,~missingbands], axis=-1)
 
     # Now we calculate the X-ray contribution to both kinds of chi2, if applicable.
     if ((lgh.xray_stellar_em is not None) or (lgh.xray_agn_em is not None)):
