@@ -42,6 +42,7 @@ packages = ["lightning"]
 [project.optional-dependencies]
 dev = [
   "ruff",
+  "flake8",
   "pytest",
   "pytest-cov",
 ]
