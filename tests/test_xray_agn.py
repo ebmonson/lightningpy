@@ -19,7 +19,7 @@ class TestXrayAGN:
 
     wave_grid_default = np.logspace(-6,-1,200)
 
-    arf = Table.read('../examples/photometry/cdfn_near_aimpoint.arf')
+    arf = Table.read('examples/photometry/cdfn_near_aimpoint.arf')
     # ages = np.array([0, 1e7, 1e8, 1e9, 5e9, univ_age*1e9])
 
     agn = AGNModel(
