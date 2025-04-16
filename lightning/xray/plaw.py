@@ -155,7 +155,7 @@ class XrayPlaw(XrayEmissionModel):
         countrate_hires = self.get_model_countrate_hires(params, exptau=None)
 
         if (Nmodels == 1):
-            lnu_hires = lnu_hires.reshape(1,-1)
+            countrate_hires = countrate_hires.reshape(1,-1)
 
         countrate = np.zeros((Nmodels, self.Nfilters))
 
@@ -335,7 +335,7 @@ class XrayPlawExpcut(XrayEmissionModel):
         countrate_hires = self.get_model_countrate_hires(params, exptau=None)
 
         if (Nmodels == 1):
-            lnu_hires = lnu_hires.reshape(1,-1)
+            countrate_hires = countrate_hires.reshape(1,-1)
 
         countrate = np.zeros((Nmodels, self.Nfilters))
 

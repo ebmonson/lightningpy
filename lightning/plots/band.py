@@ -68,7 +68,7 @@ class ModelBand:
         the same realization can be chosen multiple times.
         '''
 
-        idcs = self.rng.choice(Nreal, size=num, replace=replace)
+        idcs = self.rng.choice(self.Nreal, size=num, replace=replace)
 
         real = np.array(self.y)[idcs,:]
 

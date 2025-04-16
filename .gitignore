@@ -6,6 +6,7 @@ __pycache__
 
 .ipynb_checkpoints
 
+tests_old
 testbench.ipynb
 *_test.ipynb
 *_test.py

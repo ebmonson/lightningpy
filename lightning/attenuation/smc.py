@@ -24,7 +24,7 @@ class SMC(TabulatedAtten):
     param_descr = ['Optical depth of the diffuse ISM']
     param_names_fncy = [r'$\tau_{V,\rm diff}$']
     param_bounds = np.array([0, 1e5]).reshape(1,2)
-    path = 'dust/att/smc.txt'
+    path = 'dust/att/SMC.txt'
 
     def evaluate(self, params):
         '''Evaluate the attenuation as a function of wavelength for the given parameters.
