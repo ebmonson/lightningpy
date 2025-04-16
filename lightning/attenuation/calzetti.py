@@ -35,6 +35,9 @@ class CalzettiAtten(AnalyticAtten):
         '''Helper function to convert tauV -> AV
         '''
 
+        if (len(params.shape) == 1):
+            params = params.reshape(1,-1)
+
         return 2.5 * params[:,0] / np.log(10)
 
     def evaluate(self, params):
@@ -131,6 +134,9 @@ class ModifiedCalzettiAtten(AnalyticAtten):
     def get_AV(self, params):
         '''Helper function to convert tauV -> AV
         '''
+
+        if (len(params.shape) == 1):
+            params = params.reshape(1,-1)
 
         return 2.5 * params[:,0] / np.log(10)
 

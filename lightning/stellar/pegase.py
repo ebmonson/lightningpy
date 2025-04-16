@@ -266,7 +266,7 @@ class PEGASEModel(BaseEmissionModel):
 
         if (self.step):
 
-            Nbins = len(age) - 1
+            Nbins = len(self.age) - 1
             self.Nages = Nbins
 
             q0_age = np.zeros((Nbins, Nmet), dtype='double') # Ionizing photons per bin
@@ -304,7 +304,7 @@ class PEGASEModel(BaseEmissionModel):
 
         else:
 
-            Nages = len(age)
+            Nages = len(self.age)
             self.Nages = Nages
 
             q0_age = np.zeros((Nages, Nmet), dtype='double') # Ionizing photons per bin
@@ -322,11 +322,12 @@ class PEGASEModel(BaseEmissionModel):
 
                 # Vectorize later
                 for k in np.arange(len(nu_model_obs)):
-                    lnu_age[:,j,k] = np.interp(age, time, lnu_obs[k,j,:])
+                    # Dims are metallicity, wavelength, time
+                    lnu_age[:,j,k] = np.interp(age, time, lnu_obs[j,k,:])
 
                 if (nebular_effects):
                     for k in np.arange(Nlines):
-                        l_lines_age[:,j,k] = np.interp(age, time, l_lines_strong[k,j,:])
+                        l_lines_age[:,j,k] = np.interp(age, time, l_lines_strong[j,k,:])
 
 
         #t1 = time_module.time()
@@ -502,7 +503,7 @@ class PEGASEModel(BaseEmissionModel):
             return lnu_attenuated, lnu_unattenuated, L_TIR
 
 
-    def get_model_lnu(self, sfh, sfh_param, params=None, exptau=None, exptau_youngest=None, stepwise=False):
+    def get_model_lnu(self, sfh, sfh_param, params, exptau=None, exptau_youngest=None, stepwise=False):
         '''Construct the stellar SED as observed in the given filters.
 
         Given a SFH instance and set of parameters, the corresponding high-resolution spectrum
@@ -562,7 +563,7 @@ class PEGASEModel(BaseEmissionModel):
         # It is sometimes useful to have the spectra evaluated at each stellar age
         if stepwise:
 
-            ages_lnu_attenuated, ages_lnu_unattenuated, ages_L_TIR = self.get_model_lnu_hires(sfh, sfh_param, exptau=exptau, exptau_youngest=exptau_youngest, stepwise=True)
+            ages_lnu_attenuated, ages_lnu_unattenuated, ages_L_TIR = self.get_model_lnu_hires(sfh, sfh_param, params, exptau=exptau, exptau_youngest=exptau_youngest, stepwise=True)
 
             if (Nmodels == 1):
                 ages_lnu_attenuated = ages_lnu_attenuated.reshape(1, self.Nages, -1)
@@ -585,7 +586,7 @@ class PEGASEModel(BaseEmissionModel):
             return ages_lmod_attenuated, ages_lmod_unattenuated, ages_L_TIR
         else:
 
-            lnu_attenuated, lnu_unattenuated, L_TIR = self.get_model_lnu_hires(sfh, sfh_param, exptau=exptau, exptau_youngest=exptau_youngest, stepwise=False)
+            lnu_attenuated, lnu_unattenuated, L_TIR = self.get_model_lnu_hires(sfh, sfh_param, params, exptau=exptau, exptau_youngest=exptau_youngest, stepwise=False)
 
             if (Nmodels == 1):
                 lnu_attenuated = lnu_attenuated.reshape(1,-1)
@@ -820,6 +821,7 @@ class PEGASEModelA24(BaseEmissionModel):
             # print(self.line_labels)
 
             line_idcs = np.array([np.asarray(line_names == l).nonzero()[0] for l in self.line_labels])
+            assert line_idcs.size != 0, 'Specified lines are not in database. Check formatting of line labels in the full list.'
 
             # In the PEGASE model the ionizing flux falls
             # to exactly 0 for t > 50 Myr
@@ -1376,11 +1378,17 @@ class PEGASEBurstA24(PEGASEModelA24):
         # Zmet = params[:,2]
         # logU = params[:,3]
 
-        finterp_lnu = interp1d(self.age, np.log10(self.Lnu_obs), axis=0)
+        # finterp_lnu = interp1d(self.age, 
+        #                        np.log10(self.Lnu_obs,
+        #                                 where=(self.Lnu_obs > 0),
+        #                                 out=(np.zeros_like(self.Lnu_obs) - 1000)), 
+        #                        axis=0)
 
         # The axes go (age, Z, logU, wave)
         lnu_unattenuated = 10**interpn((self.age, self.Zmet, self.logU),
-                                 np.log10(self.Lnu_obs),
+                                 np.log10(self.Lnu_obs,
+                                        where=(self.Lnu_obs > 0),
+                                        out=(np.zeros_like(self.Lnu_obs) - 1000)),
                                  params[:,1:],
                                  method='linear')
 

@@ -728,7 +728,7 @@ class BPASSModel(BaseEmissionModel):
         L_lines = 10**interpn((self.Zmet, self.logU),
                              np.log10(lines_transp,
                                       where=(lines_transp > 0),
-                                      out=(np.zeros(lines_transp) - 1000.0)),
+                                      out=(np.zeros_like(lines_transp) - 1000.0)),
                              params,
                              method='linear')
         #print(L_lines)
@@ -925,6 +925,8 @@ class BPASSModelA24(BaseEmissionModel):
             # print(self.line_labels)
 
             line_idcs = np.array([np.asarray(line_names == l).nonzero()[0] for l in self.line_labels])
+            assert line_idcs.size != 0, 'Specified lines are not in database. Check formatting of line labels in the full list.'
+
             # print(line_idcs)
 
             # Leave the nebula in place around old stars?
@@ -1516,7 +1518,7 @@ class BPASSBurstA24(BPASSModelA24):
         # Zmet = params[:,2]
         # logU = params[:,3]
 
-        finterp_lnu = interp1d(self.age, np.log10(self.Lnu_obs), axis=0)
+        # finterp_lnu = interp1d(self.age, np.log10(self.Lnu_obs), axis=0)
 
         # The axes go (age, Z, logU, wave)
         lnu_unattenuated = 10**interpn((self.age, self.Zmet, self.logU),
