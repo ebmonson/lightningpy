@@ -4,7 +4,7 @@ import numpy as np
 from astropy.cosmology import FlatLambdaCDM
 from lightning import get_filters
 from lightning.sfh import PiecewiseConstSFH,DelayedExponentialSFH
-from lightning.stellar import PEGASEModelA24
+from lightning.stellar import PEGASEModel
 from astropy.table import Table
 
 class TestXrayStellar:
@@ -25,13 +25,13 @@ class TestXrayStellar:
     arf = Table.read('examples/photometry/cdfn_near_aimpoint.arf')
     ages = np.array([0, 1e7, 1e8, 1e9, 5e9, univ_age*1e9])
     sfh = PiecewiseConstSFH(ages)
-    stars = PEGASEModelA24(
+    stars = PEGASEModel(
         filter_labels, 
         redshift,
         age=ages
     )
 
-    stars_cont = PEGASEModelA24(
+    stars_cont = PEGASEModel(
         filter_labels, 
         redshift,
         step=False
@@ -69,7 +69,7 @@ class TestXrayStellar:
         )
 
         params = np.array([1.8])
-        st_params = np.array([0.02, -2.0]).reshape(1,-1)
+        st_params = np.array([0.02]).reshape(1,-1)
         sfh_params = np.array([1,1,1,1,1]).reshape(1,-1)
 
         # First one should be able to calculate

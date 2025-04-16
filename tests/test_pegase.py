@@ -1,8 +1,11 @@
+import os
 import pytest
 from lightning.stellar import PEGASEModel as oldstellar, PEGASEModelA24 as newstellar, PEGASEBurstA24 as burst
 from lightning.sfh import PiecewiseConstSFH, DelayedExponentialSFH
 import numpy as np
 from astropy.cosmology import FlatLambdaCDM
+
+REMOTE = bool(os.environ.get('CI')) or bool(os.environ.get('GITHUB_ACTIONS'))
 
 class TestPEGASE:
 
@@ -85,6 +88,7 @@ class TestPEGASE:
         assert pg2.Lbol.shape == (50, len(pg2.Zmet))
         assert np.all(pg2.age == age)
 
+    @pytest.mark.skipif(REMOTE, reason='Model files not available.')
     def test_pegase_A24_binned(self):
 
         # 5 age bins properly configured
@@ -137,6 +141,7 @@ class TestPEGASE:
         with pytest.raises(AssertionError):
             pg6 = newstellar(self.filter_labels, 0.1, age=age, line_labels=['HA6562', 'HB4861'])
 
+    @pytest.mark.skipif(REMOTE, reason='Model files not available.')
     def test_pegase_A24_continuous(self):
         
         # Using the stellar age specification from the model files
@@ -172,6 +177,7 @@ class TestPEGASE:
         assert pg2.Lbol.shape == (50, len(pg2.Zmet))
         assert np.all(pg2.age == age)
 
+    @pytest.mark.skipif(REMOTE, reason='Model files not available.')
     def test_pegase_A24_burst(self):
 
         pg = burst(self.filter_labels, self.redshift)

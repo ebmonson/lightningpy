@@ -1,9 +1,13 @@
+import os
 import pytest
 from lightning.stellar import BPASSModel as oldstellar, BPASSModelA24 as newstellar, BPASSBurstA24 as burst
 from lightning.sfh import PiecewiseConstSFH, DelayedExponentialSFH
 import numpy as np
 from astropy.cosmology import FlatLambdaCDM
 
+REMOTE = bool(os.environ.get('CI')) or bool(os.environ.get('GITHUB_ACTIONS'))
+
+@pytest.mark.skipif(REMOTE, reason='Model files not available.')
 class TestBPASS:
 
     filter_labels = ['GALEX_FUV', 'GALEX_NUV',
