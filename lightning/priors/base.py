@@ -45,7 +45,7 @@ class AnalyticPrior():
         CDF).
         '''
 
-        return np.zeros_like(x)
+        return np.zeros_like(q)
 
     def sample(self, size, rng=None, seed=None):
         '''Sample from the prior.

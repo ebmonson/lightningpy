@@ -33,3 +33,10 @@ Upper Limits and Missing Bands
 - Missing bands, on the other hand, should be specified by setting the flux to ``NaN`` and corresponding uncertainty to
   0. Take care when using masked arrays to fill in masked bands - in particular, ``astropy`` methods for reading fits
   tables may convert your data to masked arrays without your knowledge, producing unintended results.
+
+Tests
+-----
+
+- Multiple of the tests which require model files to be installed are skipped automatically when we upload a new build. You can
+  (and should) run these tests with ``pytest`` after installing the code and model libraries locally to make sure you've got everything in the
+  right place.
