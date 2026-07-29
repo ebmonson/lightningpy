@@ -15,3 +15,4 @@ star formation histories.
     examples/line_ratio_grids.ipynb
     examples/J033226_AGN_fit.ipynb
     examples/NGC5728_agn_fit.ipynb
+    examples/XBPASS_LX_SFR.ipynb
