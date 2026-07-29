@@ -792,6 +792,12 @@ class BPASSModelA24(BaseEmissionModel):
         following the same recipe as we typically adopt (see ``lightning_models/models/BPASS_Cloudy/README.md``).
         Note that this fixes the IMF to the BPASS `imf_135_100` adopted in Garofali+. Note that this model doesn't
         extend fully to the X-rays yet, it just modifies the line emission due to the considerably larger Q(He II).
+    XBPASS : bool
+        If ``True'', the spectra loaded will be the Bray+(2025) XBPASS models. In the optical and NIR, the base stellar
+        populations are identical to the original `imf_135_300` BPASS models. They have been postprocessed to add emission
+        from X-ray binaries, and we have postprocessed them further with our typical Cloudy recipe. The ionizing photons
+        added by the X-ray binary power law may result in a very small shift in the emission line ratios relative to standard BPASS 
+        models. This option is currently incompatible with the ``ULX`` option, and requires ``binaries`` set to ``True``.
     nebular_effects : bool
         If ``True``, the spectra will include nebular extinction, continua, and lines.
     line_labels : np.ndarray, (Nlines,), string, optional
@@ -837,7 +843,7 @@ class BPASSModelA24(BaseEmissionModel):
     gridded = False
 
     def _construct_model(self, age=None, lognH=2.0, step=True,
-                         wave_grid=None, cosmology=None, binaries=True, ULX=False,
+                         wave_grid=None, cosmology=None, binaries=True, ULX=False, XBPASS=False,
                          nebular_effects=True, line_labels=None, nebula_old=False, dust_grains=False):
         '''
             Load the appropriate models from the BPASS h5 files and either integrate
@@ -856,10 +862,21 @@ class BPASSModelA24(BaseEmissionModel):
         #     fnames = ['BPASS_imf135_300_z%s_bin_ng.h5' % (s) for s in Zstr]
         # f = h5py.File(self.modeldir.joinpath(fnames[0]).open('rb'))
 
+        if ULX and XBPASS:
+            raise ValueError('ULX and XBPASS options are incompatible.')
+        if (nebular_effects) and (not binaries):
+            raise ValueError('Binaries are required to use the Cloudy nebular emission grids.')
+        if (XBPASS) and (not binaries):
+            raise ValueError('Binaries are required to use the XBPASS model grid.')
+
         if ULX:
             self.modeldir = self.modeldir.joinpath('BPASS_Cloudy/imf_135_100/SXP/')
             fname = 'BPASS_G24_imf135_100_fullgrid_%s.h5' % dust_str
             # self.path_to_models = self.path_to_models + 'BPASS_Cloudy/imf_135_100/SXP/BPASS_G24_imf135_100_fullgrid_%s.h5' % dust_str
+        elif XBPASS:
+            self.modeldir = self.modeldir.joinpath('BPASS_Cloudy/imf_135_300/')
+            fname = 'XBPASS_fullgrid_g.h5'
+            assert lognH == 2.0, 'Currently only the Cloudy simulations with lognH = 2 are complete.'
         else:
             self.modeldir = self.modeldir.joinpath('BPASS_Cloudy/imf_chab300/')
             fname = 'BPASS_imf_chab300_fullgrid_%s.h5' % dust_str
@@ -868,10 +885,7 @@ class BPASSModelA24(BaseEmissionModel):
         # f = h5py.File(self.path_to_models)
         f = h5py.File(self.modeldir.joinpath(fname).open('rb'))
 
-        self.Zmet = f['Zstars'][:]
-
-        if (nebular_effects) and (not binaries):
-            raise ValueError('Binaries are required to use the Cloudy nebular emission grids.')
+        self.Zmet = f['Zstars'][:]        
 
         if cosmology is None:
             from astropy.cosmology import FlatLambdaCDM
@@ -990,6 +1004,14 @@ class BPASSModelA24(BaseEmissionModel):
             self.param_names_fncy = [r'$Z$']
             self.param_bounds = np.array([np.min(self.Zmet), np.max(self.Zmet)]).reshape(1,2)
 
+        if XBPASS:
+            LX = f['Lx'][:,:,:]
+            self.xray_bands = np.array(
+                [[0.5, 2.0],
+                [2.0, 7.0],
+                [0.5, 7.0]]
+            )
+
         f.close()
 
         wave_model_obs = wave_model * (1 + self.redshift)
@@ -1018,6 +1040,9 @@ class BPASSModelA24(BaseEmissionModel):
             mstar_age = np.zeros((Nbins,len(self.Zmet)), dtype='double') # Mass in bin
             mstar_rem_age = np.zeros((Nbins,len(self.Zmet)), dtype='double')
 
+            if XBPASS: 
+                LX_age = np.zeros((Nbins, len(self.Zmet), len(self.xray_bands)))
+                
             for i in np.arange(Nbins):
 
                 #if (i == Nbins - 1): dt = 1e6
@@ -1040,6 +1065,9 @@ class BPASSModelA24(BaseEmissionModel):
                 else:
                     lnu_age[i,...] = np.sum(lnu_obs[fullbins,...] * deltat[fullbins,None,None], axis=0)
 
+                if XBPASS:
+                    LX_age[i,...] = np.sum(LX[fullbins, ...] * deltat[fullbins, None, None], axis=0)
+
                 if np.any(partialbinlo):
                     deltat_partial = time_hi[partialbinlo] - ti
                     q0_age[i,:] +=  np.squeeze(q0[partialbinlo,:] * deltat_partial)
@@ -1049,6 +1077,9 @@ class BPASSModelA24(BaseEmissionModel):
                     lnu_age[i,...] += np.squeeze(lnu_obs[partialbinlo,...] * deltat_partial)
                     if nebular_effects:
                         linelum_age[i,...] += np.squeeze(linelum[partialbinlo,...] * deltat_partial)
+                    if XBPASS:
+                        LX_age[i,...] += np.squeeze(LX[partialbinlo, ...] * deltat_partial)
+
                 if np.any(partialbinhi):
                     deltat_partial = tf - time_lo[partialbinhi]
                     q0_age[i,:] += np.squeeze(q0[partialbinhi,:] * deltat_partial)
@@ -1058,6 +1089,8 @@ class BPASSModelA24(BaseEmissionModel):
                     lnu_age[i,...] += np.squeeze(lnu_obs[partialbinhi,...] * deltat_partial)
                     if nebular_effects:
                         linelum_age[i,...] += np.squeeze(linelum[partialbinhi,...] * deltat_partial)
+                    if XBPASS:
+                        LX_age[i,...] += np.squeeze(LX[partialbinhi, ...] * deltat_partial)
 
                 # Since we effectively assume Hbeta := 1 for all t, int(Hbeta, dt, ti, tf) = tf - ti
                 # if nebular_effects:
@@ -1093,12 +1126,18 @@ class BPASSModelA24(BaseEmissionModel):
             if (nebular_effects):
                 linelum_finterp = interp1d(time, linelum, axis=0)
                 linelum_age = linelum_finterp(self.age)
+            
+            if XBPASS:
+                LX_age = interp1d(time, LX, axis=0)(self.age)
 
         self.mstar = mstar_age
         self.Lbol = lbol_age
         self.q0 = q0_age
         # self.line_ratios = lineratios_age
         self.line_lum = linelum_age
+
+        if XBPASS:
+            self.LX = LX_age
 
         c_um = const.c.to(u.micron / u.s).value
 
@@ -1452,6 +1491,68 @@ class BPASSModelA24(BaseEmissionModel):
             Lmod_lines_ext = exptau * Lmod_lines
 
             return Lmod_lines_ext, Lmod_lines
+    
+    def get_model_LX(self, sfh, sfh_param, params, stepwise=False):
+        '''Return the intrinsic X-ray luminosity of the population in three energy ranges (0.5-2, 2-7, 0.5-7 keV).
+
+        Parameters
+        ----------
+        sfh : instance of lightning.sfh.PiecewiseConstSFH or lightning.sfh.FunctionalSFH
+            Star formation history model.
+        sfh_params : np.ndarray, (Nmodels, Nparam) or (Nparam,), float32
+            Parameters for the star formation history.
+        params : np.ndarray, (Nmodels, 1) or (Nmodels,)
+            Values for Z and logU
+        stepwise : bool
+            If true, the X-ray luminosities are returned as a function of stellar age.
+
+        Returns
+        -------
+        LX : np.ndarray, (Nmodels, 3) or (Nmodels, Nages, 3)
+            Intrinsic X-ray luminosity in 0.5-2, 2-7, and 0.5-7 keV ranges, optionally
+            as a function of age.
+        
+        '''
+
+        assert self.LX is not None, "LX can only be calculated for XBPASS models."
+
+        if (len(sfh_param.shape) == 1):
+            sfh_param = sfh_param.reshape(1, -1)
+        Nmodels = sfh_param.shape[0]
+        assert (params.shape[0] == Nmodels), 'First dimension of stellar param array must match first dimension of SFH.'
+        ob_mask = self._check_bounds(params)
+        if np.any(ob_mask):
+            raise ValueError('%d stellar param value(s) are out of bounds' % (np.count_nonzero(ob_mask)))
+
+        # Make metallicity the first axis
+        LX_transp = np.transpose(
+            self.LX, axes=[1,0,2]
+        )
+
+        LX_interp = 10**(interp1d(
+            self.Zmet, 
+            np.log10(LX_transp,
+                     where=(LX_transp > 0),
+                     out=(np.zeros_like(LX_transp))
+            ), 
+            axis=0
+        )(params[:,0]))
+        # Send the originally 0 luminosities made NaN by log interpolation back to 0.
+        LX_interp[np.isnan(LX_interp)] = 0
+        
+        if stepwise:
+            ages_LX = sfh.multiply(sfh_param, LX_interp)
+
+            return ages_LX
+
+        else:
+            if (self.step):
+                LX = sfh.sum(sfh_param, LX_interp)
+            else:
+                LX = sfh.integrate(sfh_param, LX_interp)
+
+            return LX
+
 
 class BPASSBurstA24(BPASSModelA24):
     '''
@@ -1460,7 +1561,7 @@ class BPASSBurstA24(BPASSModelA24):
     '''
 
     def __init__(self, filter_labels, redshift, wave_grid=None, age=None, lognH=2.0, cosmology=None,
-                 line_labels=None, dust_grains=False, nebula_old=False, ULX=False):
+                 line_labels=None, dust_grains=False, nebula_old=False, ULX=False, XBPASS=False):
 
         if cosmology is None:
             from astropy.cosmology import FlatLambdaCDM
@@ -1470,7 +1571,7 @@ class BPASSBurstA24(BPASSModelA24):
 
         # "Erik googled how super() works after 15 years"
         super().__init__(filter_labels, redshift, step=False, wave_grid=wave_grid, age=age, lognH=lognH, cosmology=cosmology,
-                         line_labels=line_labels, dust_grains=dust_grains, nebula_old=nebula_old, ULX=ULX)
+                         line_labels=line_labels, dust_grains=dust_grains, nebula_old=nebula_old, ULX=ULX, XBPASS=XBPASS)
 
         # Overwrite parameters for clarity
         self.nebular = True # Why wouldn't you
@@ -1657,3 +1758,88 @@ class BPASSBurstA24(BPASSModelA24):
         L_lines_ext = exptau * L_lines
 
         return L_lines_ext, L_lines
+
+    def get_model_LX(self, params):
+        '''Return the intrinsic X-ray luminosity of the burst in three energy ranges (0.5-2, 2-7, 0.5-7 keV).
+
+        Parameters
+        ----------
+        params : array-like (Nmodels, 4)
+            The parameters are, in order, Mburst, tburst, Z, and logU. In practice we'll probably
+            sample log(Mburst) and log(tburst).
+
+        Returns
+        -------
+        LX
+        
+        '''
+
+        assert self.LX is not None, "LX can only be calculated for XBPASS models."
+
+        ob_mask = self._check_bounds(params)
+        if np.any(ob_mask):
+            raise ValueError('%d stellar param value(s) are out of bounds' % (np.count_nonzero(ob_mask)))
+        
+        if (len(params.shape) == 1):
+            params = params.reshape(1, -1)
+        
+        params = params.copy()
+
+        params[:,:2] = 10**params[:,:2]
+
+        Nmodels = params.shape[0]
+        Mburst = params[:,0]
+
+        LX_interp = 10**interpn(
+            (self.age, self.Zmet),
+            np.log10(self.LX,
+                     where=(self.LX > 0),
+                     out=(np.zeros_like(self.LX) - 1000.0)),
+            params[:,1:3],
+            method='linear'
+        )
+
+        # Send the originally 0 luminosities made NaN by log interpolation back to 0.
+        LX_interp[np.isnan(LX_interp)] = 0
+
+        LX_interp *= Mburst[:,None]
+        
+        return LX_interp
+    
+    def get_mstar(self, params):
+        '''Return the surviving stellar mass (i.e. current stellar mass) of the burst.
+
+        Parameters
+        ----------
+        params : array-like (Nmodels, 4)
+            The parameters are, in order, Mburst, tburst, Z, and logU. In practice we'll probably
+            sample log(Mburst) and log(tburst).
+
+        Returns
+        -------
+        mstar_surv
+        
+        '''
+
+
+        ob_mask = self._check_bounds(params)
+        if np.any(ob_mask):
+            raise ValueError('%d stellar param value(s) are out of bounds' % (np.count_nonzero(ob_mask)))
+        
+        if (len(params.shape) == 1):
+            params = params.reshape(1, -1)
+        
+        params = params.copy()
+
+        params[:,:2] = 10**params[:,:2]
+
+        mstar_surv = interpn(
+            (self.age, self.Zmet),
+            self.mstar,
+            params[:,1:3],
+            method='linear'
+        )
+
+        mstar_surv *= params[:,0]
+
+        return mstar_surv

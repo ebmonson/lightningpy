@@ -196,6 +196,82 @@ class TestBPASS:
         lines,_ = bp.get_model_lines(np.array([6,7,0.02,-2.0]).reshape(1,4))
         assert lines.size == bp.line_labels.size
 
+    def test_xbpass_binned(self):
+
+        # 5 age bins properly configured
+        age = np.array([0, 1.0e7, 1.0e8, 1.0e9, 5e9, self.univ_age * 1e9])
+        bp = newstellar(self.filter_labels, 0.1, age=age, XBPASS=True)
+
+        assert bp.filter_labels == self.filter_labels
+        assert bp.Lnu_obs.shape == (5, len(bp.Zmet), len(bp.logU), len(bp.wave_grid_obs))
+        assert bp.mstar.shape == (5, len(bp.Zmet))
+        assert bp.q0.shape == (5, len(bp.Zmet))
+        assert bp.Lbol.shape == (5, len(bp.Zmet))
+        assert bp.xray_bands.shape == (3, 2)
+        assert bp.LX.shape == (5, len(bp.Zmet), bp.xray_bands.shape[0])
+
+        sfh = PiecewiseConstSFH(age)
+        lnu,_,_ = bp.get_model_lnu(sfh, 
+                                   np.array([1,1,1,1,1]).reshape(1,5), 
+                                   np.array([0.02, -2.0]).reshape(1,2))
+        assert len(lnu) == len(self.filter_labels)
+        mstar_coeff = bp.get_mstar_coeff(0.020)
+        assert mstar_coeff.size == 5
+        lines,_ = bp.get_model_lines(sfh, 
+                                     np.array([1,1,1,1,1]).reshape(1,5), 
+                                     np.array([0.02, -2.0]).reshape(1,2))
+        assert lines.size == bp.line_labels.size
+
+        LX = bp.get_model_LX(
+            sfh, 
+            np.array([1,1,1,1,1]).reshape(1,5), 
+            np.array([0.02, -2.0]).reshape(1,2)
+        )
+
+        # Non-default wavelength grid
+        wave_grid = np.logspace(-2, 2, 100)
+        # This should warn since the new wave grid does not conver PACS or SPIRE.
+        with pytest.warns(RuntimeWarning):
+            bp2 = newstellar(self.filter_labels, 0.1, age=age, wave_grid=wave_grid)
+        assert bp2.Lnu_obs.shape == (5, len(bp2.Zmet), len(bp.logU), len(bp2.wave_grid_obs))
+        assert np.all(wave_grid == bp2.wave_grid_rest)
+        assert np.all(wave_grid * (1 + self.redshift) == bp2.wave_grid_obs)
+
+        # Too old
+        age[-1] = 1.1 * self.univ_age * 1e9
+        with pytest.raises(AssertionError):
+            bp3 = newstellar(self.filter_labels, 0.1, age=age)
+
+        # Non-default linelist
+        age[-1] = self.univ_age * 1e9
+        bp4 = newstellar(self.filter_labels, 0.1, age=age, line_labels='full')
+        assert bp4.line_lum.shape == (5, len(bp4.Zmet), len(bp4.logU), len(bp4.line_labels))
+
+        # Extra non-default linelist
+        bp5 = newstellar(self.filter_labels, 0.1, age=age, line_labels=['H__1_656280A', 'H__1_486132A'])
+        assert bp5.line_lum.shape == (5, len(bp5.Zmet), len(bp5.logU), 2)
+        assert np.all(bp5.line_labels == np.array(['H__1_656280A', 'H__1_486132A']))
+
+        # Wrong linelist
+        with pytest.raises(AssertionError):
+            bp6 = newstellar(self.filter_labels, 0.1, age=age, line_labels=['HA6562', 'HB4861'])
+    
+    def test_xbpass_burst(self):
+
+        bp = burst(self.filter_labels, self.redshift, XBPASS=True)
+
+        lnu,_,_ = bp.get_model_lnu(np.array([6,7,0.02,-2.0]).reshape(1,4))
+        assert lnu.size == len(self.filter_labels)
+        lines,_ = bp.get_model_lines(np.array([6,7,0.02,-2.0]).reshape(1,4))
+        assert lines.size == bp.line_labels.size
+
+        LX = bp.get_model_LX(np.array([6,7,0.02,-2.0]).reshape(1,4))
+        assert LX.size == 3
+
+        mstar = bp.get_mstar(np.array([6,7,0.02,-2.0]).reshape(1,4))
+        assert mstar.size == 1
+        assert mstar < 10**6
+
 
 
         
